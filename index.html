@@ -95,6 +95,31 @@
   .dayRel{font-size:12px;color:var(--muted)}
   .empty{color:var(--muted);text-align:center;padding:50px 20px;font-size:14px}
 
+  .navWrap{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(20,19,23,.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line)}
+  .nav{max-width:460px;margin:0 auto;display:flex;padding:5px 10px calc(5px + env(safe-area-inset-bottom))}
+  .navBtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;color:var(--muted);font-size:10.5px;font-weight:600;border-radius:12px}
+  .navBtn.on{color:var(--accent)}
+  .secHead{font-family:var(--display);font-size:13px;letter-spacing:1.2px;color:var(--accent);font-weight:600;margin:22px 0 10px}
+  .muscleCard{background:var(--surface);border-radius:16px;padding:2px 14px}
+  .muscleRow{display:flex;align-items:center;gap:11px;padding:12px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+  .muscleRow:first-child{border-top:none}
+  .mDot{width:9px;height:9px;border-radius:9px;flex-shrink:0}
+  .mName{flex:1;font-size:14.5px;font-weight:600}
+  .mWhen{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .mTag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:10px;background:var(--bg);letter-spacing:.3px;flex-shrink:0}
+  .volRow{display:flex;align-items:center;gap:10px;padding:7px 0}
+  .volName{width:70px;font-size:12.5px;color:var(--muted);flex-shrink:0}
+  .volTrack{flex:1;height:14px;background:var(--bg);border-radius:7px;overflow:hidden}
+  .volFill{height:100%;background:var(--accent);border-radius:7px}
+  .volVal{width:78px;text-align:right;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums;flex-shrink:0}
+  .tlEx{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+  .tlName{flex:1;font-size:14px;font-weight:600;line-height:1.25}
+  .tlSets{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+  .tlSets b{color:var(--text);font-weight:700}
+  .chipDot{display:inline-block;width:6px;height:6px;border-radius:6px;background:var(--danger);margin-left:6px;vertical-align:1.5px}
+  .moreBtn{width:100%;height:44px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--muted);font-size:13.5px;font-weight:600;margin-top:2px}
+  .hintSub{font-size:11.5px;color:var(--muted);margin-top:8px;padding:0 2px}
+
   .modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50}
   .modal{width:100%;max-width:460px;background:var(--surface);border-radius:22px 22px 0 0;padding:20px 18px calc(30px + env(safe-area-inset-bottom))}
   .modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
@@ -135,6 +160,7 @@ function ico(name,size,color){
     timer:'M10 2h4M12 14l3-3M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z',
     play:'M6 4l14 8-14 8V4Z', square:'M5 5h14v14H5z',
     menu:'M4 6h16M4 12h16M4 18h16', download:'M12 3v12M7 10l5 5 5-5M5 21h14',
+    chart:'M4 20h16M7 16v-5M12 16V6M17 16v-9',
     upload:'M12 21V9M7 14l5-5 5 5M5 3h14', share:'M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13'
   };
   const fill = name==='play'||name==='square' ? color : 'none';
@@ -178,7 +204,7 @@ function nf(n){return Number(n).toLocaleString('de-DE');}
 
 /* ============ ui state ============ */
 var ui={view:'home',activeId:null,filter:'Alle',query:'',focus:null,
-        draft:null, modal:null, watch:{running:false,elapsed:0,int:null,start:0}};
+        draft:null, modal:null, tlAll:false, watch:{running:false,elapsed:0,int:null,start:0}};
 var GROUPS=['Alle','Brust','Rücken','Beine','Schulter','Arme','Bauch'];
 
 function ex(id){return data.exercises.find(function(e){return e.id===id;});}
@@ -203,6 +229,7 @@ function render(){
   if(ui.view==='home')root.innerHTML=viewHome();
   else if(ui.view==='log')root.innerHTML=viewLog();
   else if(ui.view==='history')root.innerHTML=viewHistory();
+  else if(ui.view==='progress')root.innerHTML=viewProgress();
   // restore focus (search / add-name)
   if(ui.focus){var el=document.getElementById(ui.focus);if(el){el.focus();var v=el.value;el.value='';el.value=v;}}
   renderModal();
@@ -225,6 +252,7 @@ function viewHome(){
   var list=data.exercises.filter(function(e){
     var g=ui.filter==='Alle'||e.group===ui.filter;
     var q=!ui.query||e.name.toLowerCase().indexOf(ui.query.toLowerCase())>=0;return g&&q;});
+  var stale={};groupStatus().forEach(function(x){if(x.st==='stale')stale[x.group]=1;});
   function lastHtml(l){
     if(!l)return '<span style="color:var(--muted)">neu</span>';
     if(isTime(l))return l.weight>0?'<b>'+l.weight+'</b> kg · '+fmtTimeShort(l.seconds):'<b>'+fmtTimeShort(l.seconds)+'</b>';
@@ -247,7 +275,7 @@ function viewHome(){
      <input id="search" placeholder="Übung suchen…" value="${esc(ui.query)}">
      ${ui.query?`<button data-a="clearq" class="tap">${ico('x',17,'#8C8895')}</button>`:''}
    </div>
-   <div class="chips">${GROUPS.map(function(g){return `<button class="chip tap${ui.filter===g?' on':''}" data-a="filter" data-v="${g}">${g}</button>`;}).join('')}</div>
+   <div class="chips">${GROUPS.map(function(g){return `<button class="chip tap${ui.filter===g?' on':''}" data-a="filter" data-v="${g}">${g}${stale[g]?'<span class="chipDot"></span>':''}</button>`;}).join('')}</div>
    <div class="grid">
      ${list.map(function(e){
        var doneToday=data.sets.some(function(s){return s.exerciseId===e.id&&s.date===today;});
@@ -258,7 +286,130 @@ function viewHome(){
          <div class="exMeta">${lastHtml(lastBy[e.id])}</div></button>`;
      }).join('')}
      <button class="exCard add tap" data-a="add">${ico('plus',22,'#F5C518')}<div class="exMeta" style="color:var(--accent);margin-top:4px">Übung hinzufügen</div></button>
+   </div>${navBar('home')}`;
+}
+
+/* ---- Progress (Verlauf & Muskel-Check) ---- */
+function exById(){var m={};data.exercises.forEach(function(e){m[e.id]=e;});return m;}
+function daysSinceKey(k){var a=k.split('-').map(Number);var then=new Date(a[0],a[1]-1,a[2]);var now=new Date();now.setHours(0,0,0,0);return Math.round((now-then)/864e5);}
+function groupStatus(){
+  var by=exById(),last={};
+  data.sets.forEach(function(s){var e=by[s.exerciseId];if(!e)return;if(!last[e.group]||s.date>last[e.group])last[e.group]=s.date;});
+  return GROUPS.slice(1).map(function(g){
+    var k=last[g]||null,d=(k!==null&&k!==undefined&&k)?daysSinceKey(k):null;
+    var st=k?(d<=3?'fresh':(d<=6?'mid':'stale')):'never';
+    return {group:g,key:k,days:d,st:st};
+  });
+}
+function weekStartKey(d){d=new Date(d);d.setHours(0,0,0,0);var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return dayKey(d);}
+function weekStreak(){
+  var wk={};data.sets.forEach(function(s){var a=s.date.split('-').map(Number);wk[weekStartKey(new Date(a[0],a[1]-1,a[2]))]=1;});
+  var cur=new Date(),n=0;
+  if(!wk[weekStartKey(cur)])cur.setDate(cur.getDate()-7); /* laufende Woche zählt noch nicht gegen die Serie */
+  while(wk[weekStartKey(cur)]){n++;cur.setDate(cur.getDate()-7);}
+  return n;
+}
+function barPath(x,y,w,h,r,col){
+  r=Math.min(r,h,w/2);
+  return '<path d="M'+x.toFixed(1)+' '+(y+h).toFixed(1)+' V'+(y+r).toFixed(1)+' Q'+x.toFixed(1)+' '+y.toFixed(1)+' '+(x+r).toFixed(1)+' '+y.toFixed(1)+
+    ' H'+(x+w-r).toFixed(1)+' Q'+(x+w).toFixed(1)+' '+y.toFixed(1)+' '+(x+w).toFixed(1)+' '+(y+r).toFixed(1)+' V'+(y+h).toFixed(1)+' Z" fill="'+col+'"/>';
+}
+function navBar(active){
+  return `<div style="height:76px"></div><div class="navWrap"><div class="nav">
+    <button class="navBtn tap${active==='home'?' on':''}" data-a="tab" data-v="home">${ico('dumbbell',20)}<span>Training</span></button>
+    <button class="navBtn tap${active==='progress'?' on':''}" data-a="tab" data-v="progress">${ico('chart',20)}<span>Fortschritt</span></button>
+  </div></div>`;
+}
+function viewProgress(){
+  var by=exById();
+  var header=`<div class="header">
+     <div><div class="eyebrow">FORTSCHRITT</div><div class="dateBig">Verlauf & Muskeln</div></div>
+     <div class="top-icons"><button class="icon-btn tap" data-a="menu">${ico('menu',22,'#8C8895')}</button>${ico('trend',24,'#F5C518')}</div>
    </div>`;
+  if(!data.sets.length)return header+'<div class="empty">Noch keine Daten.<br>Logge deinen ersten Satz – hier entsteht dann dein Verlauf.</div>'+navBar('progress');
+
+  /* Kopf-Statistiken */
+  var days30={},sets30=0;
+  data.sets.forEach(function(s){if(daysSinceKey(s.date)<30){days30[s.date]=1;sets30++;}});
+  var stats=`<div class="statRow">
+     <div class="stat"><div class="statN">${weekStreak()}</div><div class="statL">Wochen-Serie</div></div>
+     <div class="stat"><div class="statN">${Object.keys(days30).length}</div><div class="statL">Tage (30 T.)</div></div>
+     <div class="stat"><div class="statN">${sets30}</div><div class="statL">Sätze (30 T.)</div></div>
+   </div>`;
+
+  /* Muskel-Check: welche Gruppe wie lange nicht trainiert */
+  var gs=groupStatus();
+  var trained=gs.filter(function(x){return x.key;}).sort(function(a,b){return b.days-a.days;});
+  var never=gs.filter(function(x){return !x.key;});
+  var COL={fresh:'var(--pr)',mid:'var(--accent)',stale:'var(--danger)',never:'var(--line)'};
+  var TCOL={fresh:'var(--pr)',mid:'var(--accent)',stale:'var(--danger)',never:'var(--muted)'};
+  var TXT={fresh:'frisch',mid:'ok',stale:'überfällig',never:'noch nie'};
+  var muscle='<div class="secHead">MUSKEL-CHECK · ZULETZT TRAINIERT</div><div class="muscleCard">'+
+    trained.concat(never).map(function(x){
+      return `<button class="muscleRow tap" data-a="musclego" data-v="${x.group}">
+        <span class="mDot" style="background:${COL[x.st]}"></span>
+        <span class="mName">${x.group}</span>
+        <span class="mWhen">${x.key?relDays(x.key):'–'}</span>
+        <span class="mTag" style="color:${TCOL[x.st]}">${TXT[x.st]}</span>
+      </button>`;}).join('')+'</div><div class="hintSub">Tippen filtert die Übungsliste auf die Gruppe.</div>';
+
+  /* Trainingstage pro Woche (letzte 8 Wochen) */
+  var wkDays={};
+  data.sets.forEach(function(s){var a=s.date.split('-').map(Number);var wkey=weekStartKey(new Date(a[0],a[1]-1,a[2]));(wkDays[wkey]=wkDays[wkey]||{})[s.date]=1;});
+  var weeks=[];
+  for(var i=7;i>=0;i--){var d=new Date();d.setDate(d.getDate()-7*i);var k=weekStartKey(d);weeks.push({key:k,n:wkDays[k]?Object.keys(wkDays[k]).length:0});}
+  var W=420,H=132,pad=26,innerW=W-2*pad,slot=innerW/8,bw=slot*0.55;
+  var ymax=Math.max(4,Math.max.apply(null,weeks.map(function(w){return w.n;})));
+  var bars=weeks.map(function(w,i){
+    var cx=pad+slot*(i+0.5);
+    if(!w.n)return '';
+    var h=w.n/ymax*(H-2*pad),y=H-pad-h;
+    var col=i===7?'#F5C518':'rgba(245,197,24,.45)';
+    return barPath(cx-bw/2,y,bw,h,3,col)+
+      '<text x="'+cx.toFixed(1)+'" y="'+(y-5).toFixed(1)+'" fill="#8C8895" font-size="9.5" font-family="Inter" text-anchor="middle">'+w.n+'</text>';
+  }).join('');
+  function wlab(k){var a=k.split('-').map(Number);return a[2]+'.'+a[1]+'.';}
+  var axis='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="#38353F"/>'+
+    '<text x="'+(pad+slot*0.5)+'" y="'+(H-8)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="middle">'+wlab(weeks[0].key)+'</text>'+
+    '<text x="'+(pad+slot*7.5)+'" y="'+(H-8)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="middle">diese Wo.</text>';
+  var weekly='<div class="secHead">AKTIVITÄT</div><div class="chartBox"><div class="chartLabel">TRAININGSTAGE PRO WOCHE</div>'+
+    '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">'+axis+bars+'</svg></div>';
+
+  /* Volumen pro Muskelgruppe (30 Tage) */
+  var vol={},tot=0;
+  data.sets.forEach(function(s){if(daysSinceKey(s.date)<30){var e=by[s.exerciseId];if(!e)return;var v=setVol(s);vol[e.group]=(vol[e.group]||0)+v;tot+=v;}});
+  var vrows=GROUPS.slice(1).map(function(g){return{g:g,v:vol[g]||0};}).sort(function(a,b){return b.v-a.v;});
+  var vmax=Math.max.apply(null,vrows.map(function(r){return r.v;}))||1;
+  var volume='<div class="secHead">VOLUMEN · LETZTE 30 TAGE</div><div class="chartBox" style="padding:14px">'+
+    (tot?vrows.map(function(r){
+      return `<div class="volRow"><span class="volName">${r.g}</span><div class="volTrack"><div class="volFill" style="width:${r.v?Math.max(2,Math.round(r.v/vmax*100)):0}%"></div></div><span class="volVal">${nf(r.v)} kg</span></div>`;
+    }).join('')+'<div class="hintSub" style="padding:4px 0 0">Volumen = Gewicht × Wiederholungen. Zeit-Übungen (Plank, Dead Hang …) zählen hier nicht.</div>'
+    :'<div class="empty" style="padding:14px">Noch kein Volumen in den letzten 30 Tagen.</div>')+'</div>';
+
+  /* Timeline: wann, was, wie viel */
+  var byDayAll={};
+  data.sets.forEach(function(s){(byDayAll[s.date]=byDayAll[s.date]||[]).push(s);});
+  var dayKeys=Object.keys(byDayAll).sort().reverse();
+  var shown=ui.tlAll?dayKeys:dayKeys.slice(0,10);
+  var tl=shown.map(function(k){
+    var arr=byDayAll[k];
+    var byEx={};arr.forEach(function(s){(byEx[s.exerciseId]=byEx[s.exerciseId]||[]).push(s);});
+    var dvol=arr.reduce(function(a,s){return a+setVol(s);},0);
+    var rows=Object.keys(byEx).map(function(eid){
+      var e=by[eid]||{name:'Gelöschte Übung',group:'',mode:'reps'};
+      var ss=byEx[eid],top;
+      if(isTime(e)){var mx=Math.max.apply(null,ss.map(function(s){return s.seconds||0;}));top='<b>'+fmtTimeShort(mx)+'</b>';}
+      else{var bs=ss.slice().sort(function(a,b){return (b.weight-a.weight)||((b.reps||0)-(a.reps||0));})[0];
+        top=bs.weight>0?'<b>'+bs.weight+'</b> kg × '+(bs.reps||0):'<b>'+(bs.reps||0)+'</b> Wdh.';}
+      return `<button class="tlEx tap" data-a="open" data-id="${eid}">
+        <span class="tlName">${esc(e.name)}</span><span class="tlSets">${ss.length}× · Top ${top}</span></button>`;
+    }).join('');
+    return '<div class="dayBlock"><div class="dayHead"><span class="dayDate">'+fmtShort(k)+'</span><span class="dayRel">'+(dvol?nf(dvol)+' kg · ':'')+relDays(k)+'</span></div>'+rows+'</div>';
+  }).join('');
+  var more=(!ui.tlAll&&dayKeys.length>10)?'<button class="moreBtn tap" data-a="tlmore">Alle '+dayKeys.length+' Trainingstage anzeigen</button>':'';
+  var timeline='<div class="secHead">TIMELINE · WAS WANN</div>'+tl+more;
+
+  return header+stats+muscle+weekly+volume+timeline+navBar('progress');
 }
 
 /* ---- Logger ---- */
@@ -505,8 +656,11 @@ document.addEventListener('click',function(ev){
     case'closemodal':ui.modal=null;ui.focus=null;renderModal();break;
     case'filter':ui.filter=v;ui.focus=null;render();break;
     case'clearq':ui.query='';ui.focus=null;render();break;
-    case'open':go('log',id);break;
-    case'back':go('home');break;
+    case'open':ui.origin=ui.view;go('log',id);break;
+    case'tab':ui.tlAll=false;go(v);break;
+    case'musclego':ui.filter=v;ui.query='';go('home');break;
+    case'tlmore':ui.tlAll=true;render();break;
+    case'back':go(ui.origin==='progress'?'progress':'home');break;
     case'gohist':go('history');break;
     case'backlog':go('log');break;
     case'wminus':d.weight=Math.max(0,Math.round((d.weight-d.step)*10)/10);render();break;
