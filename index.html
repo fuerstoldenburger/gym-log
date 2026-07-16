@@ -27,19 +27,21 @@
   ::-webkit-scrollbar{width:0;height:0}
   .tap:active{transform:scale(.96)}
   @media (prefers-reduced-motion:reduce){.tap:active{transform:none}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
   #root{max-width:460px;margin:0 auto;padding:20px 16px 40px}
 
   .eyebrow{font-family:var(--display);font-size:11px;letter-spacing:2px;color:var(--accent);font-weight:600}
   .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
   .dateBig{font-family:var(--display);font-size:25px;font-weight:600;line-height:1.1;margin-top:2px}
   .top-icons{display:flex;gap:4px;align-items:center}
-  .icon-btn{padding:8px;display:flex;align-items:center;justify-content:center}
+  .icon-btn{padding:11px;display:flex;align-items:center;justify-content:center}
 
   .statRow{display:flex;gap:8px;margin-bottom:18px}
   .stat{flex:1;background:var(--surface);border-radius:14px;padding:12px 10px;text-align:center}
   .statN{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
   .statL{font-size:10.5px;color:var(--muted);margin-top:4px}
 
+  .stickyTop{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);margin:0 -16px;padding:6px 16px 2px}
   .searchWrap{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:12px;padding:0 14px;height:46px;margin-bottom:12px}
   .searchWrap input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:15px}
 
@@ -85,7 +87,8 @@
   .setVal{flex:1;font-size:15px}
   .setVal b{font-family:var(--display);color:var(--text);font-weight:700}
   .setVol{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-  .delBtn{padding:6px;display:flex}
+  .delBtn{padding:12px;margin:-6px -4px;display:flex} /* ≥44px Touch-Ziel ohne Layout-Sprung */
+  .undoBtn{color:var(--accent);font-weight:700;font-size:13px;padding:4px 8px;margin-left:2px}
 
   .chartBox{background:var(--surface);border-radius:16px;padding:16px 12px 10px;margin-top:4px}
   .chartLabel{font-family:var(--display);font-size:12px;letter-spacing:1.2px;color:var(--muted);font-weight:500;padding:0 4px 10px}
@@ -264,7 +267,8 @@ function kcalForDay(k){
 
 /* ============ ui state ============ */
 var ui={view:'home',activeId:null,filter:'Alle',query:'',focus:null,
-        draft:null, modal:null, tlAll:false, watch:{running:false,elapsed:0,int:null,start:0}};
+        draft:null, modal:null, tlAll:false, watch:{running:false,elapsed:0,int:null,start:0},
+        scrollPos:{}, undo:null};
 var GROUPS=['Alle','Brust','Rücken','Beine','Schulter','Arme','Bauch','Cardio'];
 
 function ex(id){return data.exercises.find(function(e){return e.id===id;});}
@@ -288,6 +292,10 @@ function archiveExercise(id){var e=ex(id);if(!e)return;e.archived=true;
 /* ============ toast ============ */
 var toastT;
 function toast(msg){var t=document.getElementById('toast');t.innerHTML=ico('check',15,'#5FD08A')+' '+esc(msg);t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('show');},1300);}
+function toastUndo(msg){var t=document.getElementById('toast');
+  t.innerHTML=ico('trash',15,'#E5605C')+' '+esc(msg)+'<button class="undoBtn tap" data-a="undodel">Rückgängig</button>';
+  t.classList.add('show');clearTimeout(toastT);
+  toastT=setTimeout(function(){t.classList.remove('show');ui.undo=null;},5000);}
 
 /* ============ render ============ */
 function render(){
@@ -339,7 +347,7 @@ function viewHome(){
    <div class="header">
      <div><div class="eyebrow">HEUTE</div><div class="dateBig">${fmtFull(new Date())}</div></div>
      <div class="top-icons">
-       <button class="icon-btn tap" data-a="menu">${ico('menu',22,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="menu" aria-label="Menü — Daten &amp; Sicherung">${ico('menu',22,'#8C8895')}</button>
        ${ico('dumbbell',26,'#F5C518')}
      </div>
    </div>
@@ -350,14 +358,16 @@ function viewHome(){
      <div class="stat"><div class="statN">${nf(kcalToday)}</div><div class="statL">≈ kcal heute</div></div>
    </div>
    ${(kcalToday>0&&!data.body.length)?'<div class="hintSub" style="margin:-10px 2px 14px">kcal-Schätzung nutzt 75 kg – trag dein Gewicht im Fortschritt-Tab ein, dann wird sie genauer.</div>':''}
+   <div class="stickyTop">
    <div class="searchWrap">${ico('search',17,'#8C8895')}
-     <input id="search" placeholder="Übung suchen…" value="${esc(ui.query)}">
-     ${ui.query?`<button data-a="clearq" class="tap">${ico('x',17,'#8C8895')}</button>`:''}
+     <input id="search" placeholder="Übung suchen…" aria-label="Übung suchen" value="${esc(ui.query)}">
+     ${ui.query?`<button data-a="clearq" class="tap" aria-label="Suche löschen">${ico('x',17,'#8C8895')}</button>`:''}
    </div>
    <div class="chips">${GROUPS.map(function(g,i){
      var chip=`<button class="chip tap${ui.filter===g?' on':''}" data-a="filter" data-v="${g}">${g}${stale[g]?'<span class="chipDot"></span>':''}</button>`;
      if(i===0)chip+=`<button class="chip tap${ui.filter==='fav'?' on':''}" data-a="filter" data-v="fav">★ Favoriten</button>`;
      return chip;}).join('')}</div>
+   </div>
    ${favEmpty?'<div class="empty" style="padding:26px 20px">Noch keine Favoriten.<br>Öffne eine Übung und tippe oben auf den Stern.</div>':''}
    <div class="grid">
      ${list.map(function(e){
@@ -397,12 +407,42 @@ function barPath(x,y,w,h,r,col){
   return '<path d="M'+x.toFixed(1)+' '+(y+h).toFixed(1)+' V'+(y+r).toFixed(1)+' Q'+x.toFixed(1)+' '+y.toFixed(1)+' '+(x+r).toFixed(1)+' '+y.toFixed(1)+
     ' H'+(x+w-r).toFixed(1)+' Q'+(x+w).toFixed(1)+' '+y.toFixed(1)+' '+(x+w).toFixed(1)+' '+(y+r).toFixed(1)+' V'+(y+h).toFixed(1)+' Z" fill="'+col+'"/>';
 }
+/* generische Ein-Serien-Charts: Akzent auf dunkel, Labels nur für Max + letzten Wert */
+function barChartSvg(items,fmtV){
+  var W=420,H=132,pad=26,n=items.length,slot=(W-2*pad)/n,bw=Math.min(slot*0.55,26);
+  var ymax=Math.max.apply(null,items.map(function(i){return i.val;}))||1;
+  var maxIdx=items.reduce(function(m,it,i){return it.val>items[m].val?i:m;},0);
+  var bars=items.map(function(it,i){
+    if(!it.val)return'';
+    var cx=pad+slot*(i+0.5),h=it.val/ymax*(H-2*pad),y=H-pad-h;
+    var lab=(i===n-1||(i===maxIdx&&i<n-2))?'<text x="'+cx.toFixed(1)+'" y="'+(y-5).toFixed(1)+'" fill="#8C8895" font-size="9.5" font-family="Inter" text-anchor="middle">'+fmtV(it.val)+'</text>':'';
+    return barPath(cx-bw/2,y,bw,h,3,i===n-1?'#F5C518':'rgba(245,197,24,.45)')+lab;
+  }).join('');
+  var axis='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="#38353F"/>'+
+    '<text x="'+(pad+slot*0.5)+'" y="'+(H-8)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="middle">'+esc(items[0].label)+'</text>'+
+    '<text x="'+(pad+slot*(n-0.5))+'" y="'+(H-8)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="middle">'+esc(items[n-1].label)+'</text>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block" role="img">'+axis+bars+'</svg>';
+}
+function lineChartSvg(items,fmtV){
+  var W=420,H=140,pad=26,n=items.length;
+  var max=Math.max.apply(null,items.map(function(c){return c.val;}))||1;
+  var min=Math.min.apply(null,items.map(function(c){return c.val;}));
+  var span=(max-min)||1;
+  var pts=items.map(function(c,i){return{x:pad+(n===1?0:i*(W-2*pad)/(n-1)),y:H-pad-((c.val-min)/span)*(H-2*pad)};});
+  var line=pts.map(function(p,i){return(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' ');
+  var dots=pts.map(function(p){return'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="#F5C518"/>';}).join('');
+  var grid=[0,.5,1].map(function(f){var y=pad+f*(H-2*pad);return'<line x1="'+pad+'" y1="'+y+'" x2="'+(W-pad+6)+'" y2="'+y+'" stroke="#38353F" stroke-dasharray="2 4"/>';}).join('');
+  var labs='<text x="'+pad+'" y="'+(H-6)+'" fill="#8C8895" font-size="9" font-family="Inter">'+esc(items[0].label)+'</text>'+
+    '<text x="'+(W-pad)+'" y="'+(H-6)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="end">'+esc(items[n-1].label)+'</text>'+
+    '<text x="'+(pad-4)+'" y="'+(pad+3)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="end">'+fmtV(max)+'</text>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block" role="img">'+grid+'<path d="'+line+'" fill="none" stroke="#F5C518" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+dots+labs+'</svg>';
+}
+function e1rmOf(s){return (s.mode==='reps'&&s.weight>0&&s.reps>0&&s.reps<=15)?s.weight*(1+s.reps/30):0;}
 function navBar(active){
-  return `<div style="height:76px"></div><div class="navWrap"><div class="nav">
-    <button class="navBtn tap${active==='home'?' on':''}" data-a="tab" data-v="home">${ico('dumbbell',20)}<span>Training</span></button>
-    <button class="navBtn tap${active==='plans'?' on':''}" data-a="tab" data-v="plans">${ico('clipboard',20)}<span>Pläne</span></button>
-    <button class="navBtn tap${active==='progress'?' on':''}" data-a="tab" data-v="progress">${ico('chart',20)}<span>Fortschritt</span></button>
-  </div></div>`;
+  function b(v,icon,label){return `<button class="navBtn tap${active===v?' on':''}" data-a="tab" data-v="${v}"${active===v?' aria-current="page"':''}>${ico(icon,20)}<span>${label}</span></button>`;}
+  return `<div style="height:76px"></div><nav class="navWrap" aria-label="Hauptnavigation"><div class="nav">
+    ${b('home','dumbbell','Training')}${b('plans','clipboard','Pläne')}${b('progress','chart','Fortschritt')}
+  </div></nav>`;
 }
 
 /* ---- Trainingspläne ---- */
@@ -423,7 +463,7 @@ function viewPlans(){
   }).join('');
   return `<div class="header">
      <div><div class="eyebrow">TRAININGSPLÄNE</div><div class="dateBig">Deine Routinen</div></div>
-     <div class="top-icons"><button class="icon-btn tap" data-a="menu">${ico('menu',22,'#8C8895')}</button>${ico('clipboard',24,'#F5C518')}</div>
+     <div class="top-icons"><button class="icon-btn tap" data-a="menu" aria-label="Menü — Daten &amp; Sicherung">${ico('menu',22,'#8C8895')}</button>${ico('clipboard',24,'#F5C518')}</div>
    </div>
    ${cards}
    <button class="planCard add tap" data-a="plannew">${ico('plus',18,'#F5C518')} Neuen Plan anlegen</button>
@@ -444,14 +484,14 @@ function viewPlan(){
         <div><div class="planRowName">${e.fav?'<span style="color:var(--accent);font-size:10px">★</span> ':''}${esc(e.name)}</div>
         <div class="planRowMeta">${esc(e.group)} · ${last}</div></div>
       </button>
-      <button class="delBtn tap" data-a="planremex" data-id="${eid}">${ico('x',16,'#8C8895')}</button>
+      <button class="delBtn tap" data-a="planremex" aria-label="Aus Plan entfernen" data-id="${eid}">${ico('x',16,'#8C8895')}</button>
     </div>`;
   }).join('');
   return `<div class="logHeader">
-     <button class="icon-btn tap" data-a="planback">${ico('chevleft',24)}</button>
+     <button class="icon-btn tap" data-a="planback" aria-label="Zurück">${ico('chevleft',24)}</button>
      <div style="display:flex;gap:2px">
-       <button class="icon-btn tap" data-a="planedit">${ico('pencil',19,'#8C8895')}</button>
-       <button class="icon-btn tap" data-a="plandel">${ico('trash',19,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="planedit" aria-label="Plan umbenennen">${ico('pencil',19,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="plandel" aria-label="Plan löschen">${ico('trash',19,'#8C8895')}</button>
      </div>
    </div>
    <div class="logTitleWrap">
@@ -466,7 +506,7 @@ function viewProgress(){
   var by=exById();
   var header=`<div class="header">
      <div><div class="eyebrow">FORTSCHRITT</div><div class="dateBig">Verlauf & Muskeln</div></div>
-     <div class="top-icons"><button class="icon-btn tap" data-a="menu">${ico('menu',22,'#8C8895')}</button>${ico('trend',24,'#F5C518')}</div>
+     <div class="top-icons"><button class="icon-btn tap" data-a="menu" aria-label="Menü — Daten &amp; Sicherung">${ico('menu',22,'#8C8895')}</button>${ico('trend',24,'#F5C518')}</div>
    </div>`;
   if(!data.sets.length)return header+'<div class="empty">Noch keine Daten.<br>Logge deinen ersten Satz – hier entsteht dann dein Verlauf.</div>'+navBar('progress');
 
@@ -516,6 +556,23 @@ function viewProgress(){
     '<text x="'+(pad+slot*7.5)+'" y="'+(H-8)+'" fill="#8C8895" font-size="9" font-family="Inter" text-anchor="middle">diese Wo.</text>';
   var weekly='<div class="secHead">AKTIVITÄT</div><div class="chartBox"><div class="chartLabel">TRAININGSTAGE PRO WOCHE</div>'+
     '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">'+axis+bars+'</svg></div>';
+
+  /* Volumen-Trend: 12 Wochen */
+  var wkVol={};
+  data.sets.forEach(function(s){var a=s.date.split('-').map(Number);var wk=weekStartKey(new Date(a[0],a[1]-1,a[2]));wkVol[wk]=(wkVol[wk]||0)+setVol(s);});
+  var volWeeks=[];
+  for(var vi=11;vi>=0;vi--){var vd=new Date();vd.setDate(vd.getDate()-7*vi);var vk=weekStartKey(vd);volWeeks.push({label:vi===0?'diese Wo.':wlab(vk),val:wkVol[vk]||0});}
+  if(volWeeks.some(function(x){return x.val>0;}))
+    weekly+='<div class="chartBox" style="margin-top:10px"><div class="chartLabel">VOLUMEN PRO WOCHE (KG)</div>'+barChartSvg(volWeeks,function(v){return nf(Math.round(v));})+'</div>';
+
+  /* ≈ kcal pro Woche: 8 Wochen */
+  var dayKeysAll={};data.sets.forEach(function(s){dayKeysAll[s.date]=1;});
+  var wkK={};
+  Object.keys(dayKeysAll).forEach(function(k){var a=k.split('-').map(Number);var wk=weekStartKey(new Date(a[0],a[1]-1,a[2]));wkK[wk]=(wkK[wk]||0)+kcalForDay(k);});
+  var kWeeks=[];
+  for(var ki=7;ki>=0;ki--){var kd=new Date();kd.setDate(kd.getDate()-7*ki);var kk=weekStartKey(kd);kWeeks.push({label:ki===0?'diese Wo.':wlab(kk),val:wkK[kk]||0});}
+  if(kWeeks.some(function(x){return x.val>0;}))
+    weekly+='<div class="chartBox" style="margin-top:10px"><div class="chartLabel">≈ KCAL PRO WOCHE</div>'+barChartSvg(kWeeks,function(v){return nf(Math.round(v));})+'</div>';
 
   /* Volumen pro Muskelgruppe (30 Tage) */
   var vol={},tot=0;
@@ -663,7 +720,7 @@ function viewLog(){
       vol='<span class="setVol">'+nf(s.weight*s.reps)+' kg</span>';
     }
     return '<div class="setRow"><span class="setNo">'+(i+1)+'</span><span class="setVal">'+val+'</span>'+vol+
-      '<button class="delBtn tap" data-a="delset" data-id="'+s.id+'">'+ico('trash',16,'#8C8895')+'</button></div>';
+      '<button class="delBtn tap" data-a="delset" aria-label="Satz löschen" data-id="'+s.id+'">'+ico('trash',16,'#8C8895')+'</button></div>';
   }
   var timeControl=function(prTag,steps,lab){return `
     <div class="control">
@@ -671,9 +728,9 @@ function viewLog(){
         <div class="stepToggle">${steps.map(function(v){return `<button class="stepBtn tap${d.tStep===v?' on':''}" data-a="tstep" data-v="${v}">${lab(v)}</button>`;}).join('')}</div>
       </div>
       <div class="stepper">
-        <button class="stepperBtn tap" data-a="tminus">${ico('minus',28)}</button>
+        <button class="stepperBtn tap" data-a="tminus" aria-label="Zeit verringern">${ico('minus',28)}</button>
         <div class="valueWrap"><span class="value ${d.seconds>=60?'sm':''}" style="color:${(prTag&&isPR)?'var(--pr)':'var(--text)'}">${bigTime}</span><span class="unit">${timeUnit}</span></div>
-        <button class="stepperBtn tap" data-a="tplus">${ico('plus',28)}</button>
+        <button class="stepperBtn tap" data-a="tplus" aria-label="Zeit erhöhen">${ico('plus',28)}</button>
       </div>
       ${(prTag&&isPR)?`<div class="prTag">${ico('trend',13,'#141317')} Neue Bestzeit!</div>`:''}
       <button class="watchBtn tap ${w.running?'run':''}" data-a="watch">
@@ -687,19 +744,20 @@ function viewLog(){
     <div class="control">
       <div class="controlLabel"><span>WIEDERHOLUNGEN</span></div>
       <div class="stepper">
-        <button class="stepperBtn tap" data-a="rminus">${ico('minus',28)}</button>
+        <button class="stepperBtn tap" data-a="rminus" aria-label="Wiederholungen verringern">${ico('minus',28)}</button>
         <div class="valueWrap"><span class="value">${d.reps}</span><span class="unit">Wdh.</span></div>
-        <button class="stepperBtn tap" data-a="rplus">${ico('plus',28)}</button>
+        <button class="stepperBtn tap" data-a="rplus" aria-label="Wiederholungen erhöhen">${ico('plus',28)}</button>
       </div>
+      ${(d.weight>0&&d.reps>0&&d.reps<=15)?`<div class="hintSub" style="text-align:center;margin-top:12px">≈ geschätztes 1RM: <b style="color:var(--text);font-family:var(--display)">${Math.round(d.weight*(1+d.reps/30))} kg</b></div>`:''}
     </div>`);
 
   return `
    <div class="logHeader">
-     <button class="icon-btn tap" data-a="back">${ico('chevleft',24)}</button>
+     <button class="icon-btn tap" data-a="back" aria-label="Zurück">${ico('chevleft',24)}</button>
      <div style="display:flex;gap:2px">
-       <button class="icon-btn tap" data-a="exedit">${ico('pencil',19,'#8C8895')}</button>
-       <button class="icon-btn tap" data-a="favtoggle">${e.fav?ico('starfill',21,'#F5C518'):ico('star',21,'#8C8895')}</button>
-       <button class="icon-btn tap" data-a="gohist">${ico('history',21,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="exedit" aria-label="Übung bearbeiten">${ico('pencil',19,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="favtoggle" aria-label="${e.fav?'Favorit entfernen':'Als Favorit markieren'}">${e.fav?ico('starfill',21,'#F5C518'):ico('star',21,'#8C8895')}</button>
+       <button class="icon-btn tap" data-a="gohist" aria-label="Verlauf anzeigen">${ico('history',21,'#8C8895')}</button>
      </div>
    </div>
    <div class="logTitleWrap">
@@ -713,9 +771,9 @@ function viewLog(){
        <div class="stepToggle">${[0.1,0.5,1].map(function(v){return `<button class="stepBtn tap${d.kStep===v?' on':''}" data-a="kstep" data-v="${v}">${String(v).replace('.',',')}</button>`;}).join('')}</div>
      </div>
      <div class="stepper">
-       <button class="stepperBtn tap" data-a="kminus">${ico('minus',28)}</button>
+       <button class="stepperBtn tap" data-a="kminus" aria-label="Distanz verringern">${ico('minus',28)}</button>
        <div class="valueWrap"><span class="value" style="color:${isPR?'var(--pr)':'var(--accent)'}">${nf1(d.km)}</span><span class="unit">km</span></div>
-       <button class="stepperBtn tap" data-a="kplus">${ico('plus',28)}</button>
+       <button class="stepperBtn tap" data-a="kplus" aria-label="Distanz erhöhen">${ico('plus',28)}</button>
      </div>
      ${isPR?`<div class="prTag">${ico('trend',13,'#141317')} Neuer Distanz-Rekord!</div>`:''}
    </div>`:`
@@ -724,15 +782,16 @@ function viewLog(){
        <div class="stepToggle">${[1,2.5,5].map(function(v){return `<button class="stepBtn tap${d.step===v?' on':''}" data-a="wstep" data-v="${v}">${v}</button>`;}).join('')}</div>
      </div>
      <div class="stepper">
-       <button class="stepperBtn tap" data-a="wminus">${ico('minus',28)}</button>
+       <button class="stepperBtn tap" data-a="wminus" aria-label="Gewicht verringern">${ico('minus',28)}</button>
        <div class="valueWrap"><span class="value" style="color:${(!timed&&isPR)?'var(--pr)':'var(--accent)'}">${d.weight}</span><span class="unit">kg</span></div>
-       <button class="stepperBtn tap" data-a="wplus">${ico('plus',28)}</button>
+       <button class="stepperBtn tap" data-a="wplus" aria-label="Gewicht erhöhen">${ico('plus',28)}</button>
      </div>
      ${(!timed&&isPR)?`<div class="prTag">${ico('trend',13,'#141317')} Neuer Bestwert!</div>`:''}
    </div>`}
    ${second}
    <button class="saveBtn tap" data-a="save">${ico('check',22,'#141317')} Satz speichern</button>
    ${todaySets.length?`<div class="todayBox"><div class="todayHead">Heute · ${todaySets.length} ${todaySets.length===1?'Satz':'Sätze'}</div>${todaySets.map(setRow).join('')}</div>`:''}
+   ${navBar(navActiveOrigin())}
   `;
 }
 
@@ -749,7 +808,7 @@ function viewHistory(){
   var totalK=all.reduce(function(a,s){return a+(s.km||0);},0);
   var chart=dayList.slice().reverse().map(function(dd){return {label:fmtShort(dd.key).replace(/^.. /,''),val:cardio?dd.sumK:(timed?dd.topT:dd.topW)};});
 
-  var head=`<div class="logHeader"><button class="icon-btn tap" data-a="backlog">${ico('chevleft',24)}</button>${ico('trend',20,'#F5C518')}</div>
+  var head=`<div class="logHeader"><button class="icon-btn tap" data-a="backlog" aria-label="Zurück">${ico('chevleft',24)}</button>${ico('trend',20,'#F5C518')}</div>
    <div class="logTitleWrap"><div class="eyebrow">VERLAUF${timed?' · ZEIT':''}${cardio?' · CARDIO':''}</div><h1 class="logTitle">${esc(e.name)}</h1></div>`;
   if(!all.length)return head+'<div class="empty">Noch keine Sätze aufgezeichnet. Leg im Logger los.</div>';
 
@@ -785,6 +844,26 @@ function viewHistory(){
       <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${grid}${yhi}<path d="${line}" fill="none" stroke="#F5C518" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labs}</svg></div>`;
   }
 
+  /* Zusatz-Charts: Volumen/Training + e1RM (Kraft) bzw. Pace-Trend (Cardio) */
+  var extraCharts='';
+  var chron=dayList.slice().reverse();
+  function dlab(k){var a=k.split('-').map(Number);return a[2]+'.'+a[1]+'.';}
+  if(!timed&&!cardio){
+    var volItems=chron.map(function(dd){return {label:dlab(dd.key),val:dd.sets.reduce(function(a,s){return a+setVol(s);},0)};});
+    if(volItems.length>1&&volItems.some(function(i){return i.val>0;}))
+      extraCharts+='<div class="chartBox" style="margin-top:10px"><div class="chartLabel">VOLUMEN PRO TRAINING (KG)</div>'+barChartSvg(volItems,function(v){return nf(Math.round(v));})+'</div>';
+    var e1Items=chron.map(function(dd){return {label:dlab(dd.key),val:Math.max.apply(null,dd.sets.map(e1rmOf))};}).filter(function(i){return i.val>0;});
+    if(e1Items.length>1)
+      extraCharts+='<div class="chartBox" style="margin-top:10px"><div class="chartLabel">GESCHÄTZTES 1RM (KG) · EPLEY</div>'+lineChartSvg(e1Items,function(v){return Math.round(v);})+'</div>';
+  }
+  if(cardio){
+    var paceItems=chron.map(function(dd){
+      var km=dd.sets.reduce(function(a,s){return a+(s.km||0);},0),sec=dd.sets.reduce(function(a,s){return a+((s.km>0&&s.seconds)?s.seconds:0);},0);
+      return {label:dlab(dd.key),val:(km>0&&sec>0)?sec/km:0};}).filter(function(i){return i.val>0;});
+    if(paceItems.length>1)
+      extraCharts+='<div class="chartBox" style="margin-top:10px"><div class="chartLabel">PACE-TREND (MIN/KM) · NIEDRIGER = SCHNELLER</div>'+lineChartSvg(paceItems,function(v){return fmtPace(v,1).replace(' /km','');})+'</div>';
+  }
+
   var days=dayList.map(function(d){
     return '<div class="dayBlock"><div class="dayHead"><span class="dayDate">'+fmtShort(d.key)+'</span><span class="dayRel">'+relDays(d.key)+'</span></div>'+
       d.sets.map(function(s,i){
@@ -801,11 +880,11 @@ function viewHistory(){
           vol='<span class="setVol">'+nf(s.weight*s.reps)+' kg</span>';
         }
         return '<div class="setRow"><span class="setNo">'+(i+1)+'</span><span class="setVal">'+val+(pr?' '+ico('trend',13,'#5FD08A'):'')+'</span>'+vol+
-          '<button class="delBtn tap" data-a="delset" data-id="'+s.id+'">'+ico('trash',15,'#8C8895')+'</button></div>';
+          '<button class="delBtn tap" data-a="delset" aria-label="Satz löschen" data-id="'+s.id+'">'+ico('trash',15,'#8C8895')+'</button></div>';
       }).join('')+'</div>';
   }).join('');
 
-  return head+stats+chartHtml+'<div style="margin-top:18px">'+days+'</div>';
+  return head+stats+chartHtml+extraCharts+'<div style="margin-top:18px">'+days+'</div>'+navBar(navActiveOrigin());
 }
 
 /* ---- Modals ---- */
@@ -814,7 +893,7 @@ function modalAdd(){
   var dr=ui.addDraft||(ui.addDraft={name:'',group:'Brust',bw:false,mode:'reps'});
   var nSets=edit?setsFor(edit.id).length:0;
   return `<div class="modalWrap" data-a="closemodal"><div class="modal" data-stop="1">
-    <div class="modalHead"><h2 class="modalTitle">${edit?'Übung bearbeiten':'Neue Übung'}</h2><button class="icon-btn tap" data-a="closemodal">${ico('x',22,'#8C8895')}</button></div>
+    <div class="modalHead"><h2 class="modalTitle">${edit?'Übung bearbeiten':'Neue Übung'}</h2><button class="icon-btn tap" data-a="closemodal" aria-label="Schließen">${ico('x',22,'#8C8895')}</button></div>
     <input id="addName" class="modalInput" placeholder="Name der Übung" value="${esc(dr.name)}">
     <div class="modeToggle">
       <button class="modeBtn tap${dr.mode==='reps'?' on':''}" data-a="amode" data-v="reps">${ico('dumbbell',15)} Wdh.</button>
@@ -831,7 +910,7 @@ function modalPlanNew(){
   var edit=!!ui.editPlanId;
   var dr=ui.planDraft||(ui.planDraft={name:''});
   return `<div class="modalWrap" data-a="closemodal"><div class="modal" data-stop="1">
-    <div class="modalHead"><h2 class="modalTitle">${edit?'Plan umbenennen':'Neuer Plan'}</h2><button class="icon-btn tap" data-a="closemodal">${ico('x',22,'#8C8895')}</button></div>
+    <div class="modalHead"><h2 class="modalTitle">${edit?'Plan umbenennen':'Neuer Plan'}</h2><button class="icon-btn tap" data-a="closemodal" aria-label="Schließen">${ico('x',22,'#8C8895')}</button></div>
     <input id="planName" class="modalInput" placeholder="Name (z. B. Push, Oberkörper …)" value="${esc(dr.name)}">
     <button class="saveBtn tap" data-a="plansubmit" style="margin-top:20px;opacity:${dr.name.trim()?1:.4}">${edit?ico('check',20,'#141317')+' Speichern':ico('plus',20,'#141317')+' Anlegen'}</button>
   </div></div>`;
@@ -847,7 +926,7 @@ function modalPickEx(){
       <div><div>${e.fav?'<span style="color:var(--accent);font-size:11px">★</span> ':''}${esc(e.name)}</div><div class="menuSub">${esc(e.group)}${isTime(e)?' · Zeit':''}</div></div></button>`;
   }).join('');
   return `<div class="modalWrap" data-a="closemodal"><div class="modal" data-stop="1">
-    <div class="modalHead"><h2 class="modalTitle">Übung hinzufügen</h2><button class="icon-btn tap" data-a="closemodal">${ico('x',22,'#8C8895')}</button></div>
+    <div class="modalHead"><h2 class="modalTitle">Übung hinzufügen</h2><button class="icon-btn tap" data-a="closemodal" aria-label="Schließen">${ico('x',22,'#8C8895')}</button></div>
     <input id="pickQ" class="modalInput" placeholder="Übung suchen…" value="${esc(ui.pickQ||'')}">
     <div style="max-height:46vh;overflow-y:auto;margin-top:8px">${rows||'<div class="empty" style="padding:20px">Keine passende Übung.</div>'}</div>
   </div></div>`;
@@ -856,10 +935,10 @@ function modalBw(){
   var recent=data.body.slice().sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,5);
   var rows=recent.map(function(b){
     return `<div class="setRow"><span class="setVal"><b>${nf(b.kg)}</b> kg</span><span class="setVol">${fmtShort(b.date)}</span>
-      <button class="delBtn tap" data-a="bwdel" data-id="${b.date}">${ico('trash',15,'#8C8895')}</button></div>`;
+      <button class="delBtn tap" data-a="bwdel" aria-label="Eintrag löschen" data-id="${b.date}">${ico('trash',15,'#8C8895')}</button></div>`;
   }).join('');
   return `<div class="modalWrap" data-a="closemodal"><div class="modal" data-stop="1">
-    <div class="modalHead"><h2 class="modalTitle">Körpergewicht</h2><button class="icon-btn tap" data-a="closemodal">${ico('x',22,'#8C8895')}</button></div>
+    <div class="modalHead"><h2 class="modalTitle">Körpergewicht</h2><button class="icon-btn tap" data-a="closemodal" aria-label="Schließen">${ico('x',22,'#8C8895')}</button></div>
     <input id="bwVal" class="modalInput" type="number" step="0.1" inputmode="decimal" placeholder="Gewicht in kg" value="${ui.bwDraft||''}">
     <button class="saveBtn tap" data-a="bwsubmit" style="margin-top:16px">${ico('check',20,'#141317')} Für heute speichern</button>
     ${rows?'<div style="margin-top:14px">'+rows+'</div><div class="hintSub">Ein Eintrag pro Tag – erneutes Speichern überschreibt heute.</div>':''}
@@ -867,7 +946,7 @@ function modalBw(){
 }
 function modalMenu(){
   return `<div class="modalWrap" data-a="closemodal"><div class="modal" data-stop="1">
-    <div class="modalHead"><h2 class="modalTitle">Daten & Sicherung</h2><button class="icon-btn tap" data-a="closemodal">${ico('x',22,'#8C8895')}</button></div>
+    <div class="modalHead"><h2 class="modalTitle">Daten & Sicherung</h2><button class="icon-btn tap" data-a="closemodal" aria-label="Schließen">${ico('x',22,'#8C8895')}</button></div>
     <button class="menuItem tap" data-a="exportjson">${ico('download',20,'#F5C518')}<div><div>Backup exportieren (.json)</div><div class="menuSub">Vollständige Sicherung – zum Wiederherstellen oder aufs neue Handy</div></div></button>
     <button class="menuItem tap" data-a="exportcsv">${ico('share',20,'#F5C518')}<div><div>Als Tabelle exportieren (.csv)</div><div class="menuSub">Öffnet sich in Excel / Google Sheets</div></div></button>
     <button class="menuItem tap" data-a="importjson">${ico('upload',20,'#F5C518')}<div><div>Backup importieren</div><div class="menuSub">Ersetzt die aktuellen Daten durch eine .json-Sicherung</div></div></button>
@@ -925,10 +1004,31 @@ function stopWatchSilently(){var w=ui.watch;if(w.int)clearInterval(w.int);w.runn
 /* ============ navigation ============ */
 function go(view,id){
   stopWatchSilently();
+  ui.scrollPos[ui.view]=window.scrollY||0;
   ui.view=view;if(id!==undefined)ui.activeId=id;
   if(view==='log'){var e=ex(ui.activeId);ensureDraft(e);}
-  window.scrollTo(0,0);render();
+  render();
+  /* Listen-Ansichten merken sich die Scroll-Position, Detail-Ansichten starten oben */
+  var keep=(view==='home'||view==='plans'||view==='progress');
+  window.scrollTo(0,keep?(ui.scrollPos[view]||0):0);
 }
+function navActiveOrigin(){return ui.origin==='plan'?'plans':(ui.origin==='progress'?'progress':'home');}
+function goBack(){
+  if(ui.modal){ui.modal=null;ui.focus=null;ui.editExId=null;ui.editPlanId=null;renderModal();return;}
+  if(ui.view==='history')go('log');
+  else if(ui.view==='log')go(ui.origin==='progress'?'progress':(ui.origin==='plan'?'plan':'home'));
+  else if(ui.view==='plan')go('plans');
+}
+/* Edge-Swipe von links nach rechts = zurück */
+var swipe={x:0,y:0,t:0,edge:false};
+document.addEventListener('touchstart',function(ev){
+  var t=ev.touches[0];swipe.x=t.clientX;swipe.y=t.clientY;swipe.t=Date.now();swipe.edge=t.clientX<=28;
+},{passive:true});
+document.addEventListener('touchend',function(ev){
+  if(!swipe.edge)return;swipe.edge=false;
+  var t=ev.changedTouches[0];
+  if(t.clientX-swipe.x>70&&Math.abs(t.clientY-swipe.y)<50&&Date.now()-swipe.t<600)goBack();
+},{passive:true});
 
 /* ============ event delegation ============ */
 document.addEventListener('click',function(ev){
@@ -979,7 +1079,7 @@ document.addEventListener('click',function(ev){
       data.body.push({date:bd,kg:Math.round(bv*10)/10,ts:Date.now()});save();
       ui.modal=null;ui.focus=null;ui.bwDraft='';render();toast('Gewicht gespeichert');break;}
     case'bwdel':data.body=data.body.filter(function(b){return b.date!==id;});save();renderModal();render();break;
-    case'back':go(ui.origin==='progress'?'progress':(ui.origin==='plan'?'plan':'home'));break;
+    case'back':goBack();break;
     case'gohist':go('history');break;
     case'backlog':go('log');break;
     case'wminus':d.weight=Math.max(0,Math.round((d.weight-d.step)*10)/10);render();break;
@@ -995,7 +1095,12 @@ document.addEventListener('click',function(ev){
     case'tstep':d.tStep=parseInt(v,10);render();break;
     case'watch':toggleWatch();break;
     case'save':{var e=ex(ui.activeId);addSet(e.id,isCardio(e)?{km:d.km,seconds:d.seconds,mode:'cardio'}:(isTime(e)?{weight:d.weight,seconds:d.seconds,mode:'time'}:{weight:d.weight,reps:d.reps,mode:'reps'}));render();break;}
-    case'delset':delSet(id);render();break;
+    case'delset':{var rmSet=data.sets.filter(function(s){return s.id===id;})[0];
+      delSet(id);ui.undo=rmSet?{set:rmSet}:null;render();
+      if(rmSet)toastUndo('Satz gelöscht');break;}
+    case'undodel':{if(ui.undo&&ui.undo.set){data.sets.push(ui.undo.set);
+      data.sets.sort(function(a,b){return a.ts-b.ts;});save();ui.undo=null;}
+      clearTimeout(toastT);document.getElementById('toast').classList.remove('show');render();break;}
     case'amode':ui.addDraft.mode=v;renderModal();break;
     case'agroup':ui.addDraft.group=v;renderModal();break;
     case'asubmit':{var dr=ui.addDraft;var bwEl=document.getElementById('addBw');var bw=dr.mode==='cardio'?true:(bwEl?bwEl.checked:false);

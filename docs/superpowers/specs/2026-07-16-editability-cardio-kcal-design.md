@@ -23,3 +23,20 @@ Date: 2026-07-16 · Approved by Benjamin in chat.
 
 ## Out of scope
 Editing past set values, plan reordering, un-archive UI.
+
+---
+
+## Addendum 2026-07-16: UX overhaul (approved)
+
+Scope: all of A–D below, rest timer explicitly skipped by user.
+
+- **A1 Edge-swipe back**: touchstart ≤28px from left edge, dx>70, dy<50, <600ms → back (modal → close; history → log; log → origin; plan → plans).
+- **A2 Scroll memory**: `ui.scrollPos[view]` saved on leave; restored for list views (home/plans/progress); detail views open at top.
+- **A3 Bottom nav on all screens** incl. Logger/Verlauf (active tab = origin tab).
+- **A4 Sticky search+chips** on Home (`position:sticky`, safe-area aware).
+- **B6 e1RM**: Epley `w×(1+r/30)` live in logger (reps 1–15, weight>0) + e1RM trend chart in Verlauf.
+- **B7 Undo delete**: set deletion shows 5s "Rückgängig" toast; restore re-inserts by ts.
+- **C8 Progress**: weekly volume bars (12w), kcal/week bars (8w).
+- **C9 Verlauf**: volume/session bars + e1RM line (weights); pace trend line (cardio).
+- **D10 A11y**: aria-labels on all icon buttons, aria-current on nav, ≥44px touch targets (delBtn), :focus-visible outlines.
+- Charts follow dataviz method: single-series accent-on-dark, direct labels for max+latest, no legends, one axis.
