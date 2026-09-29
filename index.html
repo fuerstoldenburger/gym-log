@@ -406,7 +406,7 @@ function todayPlanState(todayKey){
 function fmtTarget(s,e){
   if(e&&isTime(e))return s.sets+' × '+(s.seconds?fmtTimeShort(s.seconds):(s.first?'erstes Mal':'Zeit'));
   var reps=s.repMin?s.repMin+'–'+s.repMax:'';
-  var w=s.first?'erstes Mal':(e&&e.bw&&!s.weight?'Körpergewicht':s.weight+' kg');
+  var w=s.first?'erstes Mal':(!s.weight?'Körpergewicht':s.weight+' kg');
   return s.sets+' × '+reps+' · '+w;
 }
 

@@ -1,3 +1,4 @@
 .superpowers/
 tests/.app.js
 tests/.bundle.js
+tests/.backup.json

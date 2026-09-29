@@ -83,6 +83,7 @@ data.sets=[mk('hangraise','2026-09-20',0,15,1),mk('hangraise','2026-09-20',0,15,
 s=suggestFor(P,'hangraise',T); check('bodyweight never up', s.weight===0 && s.up===false);
 check('fmtTarget', fmtTarget({sets:3,repMin:10,repMax:15,weight:65,up:true,first:false},ex('beinpresse'))==='3 × 10–15 · 65 kg');
 check('fmtTarget first', fmtTarget({sets:3,repMin:8,repMax:12,weight:null,up:false,first:true},ex('latzug'))==='3 × 8–12 · erstes Mal');
+check('fmtTarget zero weight reads Körpergewicht', fmtTarget({sets:3,repMin:10,repMax:15,weight:0,up:false,first:false},{id:'x',name:'Hang raise',group:'Bauch',bw:false,mode:'reps'})==='3 × 10–15 · Körpergewicht');
 check('fmtTarget time', fmtTarget({sets:3,seconds:75,weight:null,first:false},ex('plank'))==='3 × 1:15');
 
 section('rotation');
