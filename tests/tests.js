@@ -115,5 +115,14 @@ var hp=viewPlan();
 check('plan row shows target with up arrow', hp.indexOf('3 × 10–15 · <b>65</b> kg')>=0 && hp.indexOf('↑')>=0);
 check('plan row first time', hp.indexOf('erstes Mal')>=0);
 
+section('home card');
+fresh(); ui.view='home';
+check('home card empty history', (function(){data.schedule={mode:'3',planIds:ROTATION['3'].slice()};var h=viewHome();return h.indexOf('HEUTE DRAN')>=0&&h.indexOf('Ganzkörper A')>=0&&h.indexOf('erstes Mal')>=0;})());
+check('home card lists three exercises', (viewHome().match(/dayEx/g)||[]).length===3);
+data.schedule=emptySchedule(); check('no card when off', viewHome().indexOf('HEUTE DRAN')<0);
+data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+data.sets=plan('plan-gk-a').exIds.map(function(id,i){return {id:'d'+i,exerciseId:id,date:dayKey(new Date()),ts:i,weight:10,mode:'reps',reps:10};});
+check('home card done state', viewHome().indexOf('ERLEDIGT')>=0 && viewHome().indexOf('Ganzkörper B')>=0);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');

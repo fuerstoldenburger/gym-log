@@ -126,6 +126,9 @@
   .planCard{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:left;margin-bottom:10px;display:flex;align-items:center;gap:12px}
   .dueTag{font-size:11px;font-weight:700;color:var(--bg);background:var(--accent);border-radius:10px;padding:2px 8px;margin-left:8px;white-space:nowrap}
   .secHeadPlans{font-family:var(--display);font-size:11px;letter-spacing:2px;color:var(--muted);margin:16px 2px 8px}
+  .dayCard{border-color:var(--accent)}
+  .dayEx{font-size:12.5px;color:var(--muted);margin-top:3px} .dayEx b{color:var(--text);font-weight:600}
+  .dayMore{font-size:12px;color:var(--muted);margin-top:4px}
   .planCard.add{border-style:dashed;background:transparent;color:var(--accent);justify-content:center;font-size:14px;font-weight:600;gap:8px}
   .planName{font-size:16px;font-weight:700}
   .planMeta{font-size:12.5px;color:var(--muted);margin-top:3px}
@@ -470,6 +473,17 @@ function viewHome(){
   list=list.slice().sort(function(a,b){return (b.fav?1:0)-(a.fav?1:0);});
   var stale={};groupStatus().forEach(function(x){if(x.st==='stale')stale[x.group]=1;});
   var favEmpty=ui.filter==='fav'&&!list.length;
+  var st=todayPlanState(today),dayCard='';
+  if(st.kind!=='off'){
+    var pid=st.kind==='done'?st.nextId:st.planId,p=plan(pid);
+    if(p){
+      var eyebrow=st.kind==='today'?'HEUTE · '+st.done+'/'+st.total:(st.kind==='done'?'ERLEDIGT · NÄCHSTES':'HEUTE DRAN');
+      var rows=p.exIds.slice(0,3).map(function(eid){var e=ex(eid);if(!e)return'';return '<div class="dayEx"><b>'+esc(e.name)+'</b> · '+fmtTarget(suggestFor(p,eid,today),e)+'</div>';}).join('');
+      dayCard=`<button class="planCard dayCard tap" data-a="homeplan" data-id="${p.id}">
+        <div style="min-width:0"><div class="eyebrow">${eyebrow}</div><div class="planName">${esc(p.name)}</div>${rows}${p.exIds.length>3?'<div class="dayMore">+ '+(p.exIds.length-3)+' weitere</div>':''}</div>
+        ${ico('chevright',18,'#F5C518')}</button>`;
+    }
+  }
   function lastHtml(l){
     if(!l)return '<span style="color:var(--muted)">neu</span>';
     if(isCardio(l))return '<b>'+nf1(l.km||0)+'</b> km'+(l.seconds?' · '+fmtTimeShort(l.seconds):'');
@@ -490,6 +504,7 @@ function viewHome(){
      <div class="stat"><div class="statN">${nf(vol)}</div><div class="statL">kg Volumen</div></div>
      <div class="stat"><div class="statN">${nf(kcalToday)}</div><div class="statL">≈ kcal heute</div></div>
    </div>
+   ${dayCard}
    ${(kcalToday>0&&!data.body.length)?'<div class="hintSub" style="margin:-10px 2px 14px">kcal-Schätzung nutzt 75 kg – trag dein Gewicht im Fortschritt-Tab ein, dann wird sie genauer.</div>':''}
    <div class="stickyTop">
    <div class="searchWrap">${ico('search',17,'#8C8895')}
@@ -1203,6 +1218,7 @@ document.addEventListener('click',function(ev){
     case'favtoggle':{var fe=ex(ui.activeId);fe.fav=!fe.fav;save();render();toast(fe.fav?'Als Favorit markiert':'Favorit entfernt');break;}
     case'planopen':ui.activePlanId=id;go('plan');break;
     case'planback':go('plans');break;
+    case'homeplan':ui.activePlanId=id;ui.origin='home';go('plan');break;
     case'rotmode':{data.schedule=v==='off'?emptySchedule():{mode:v,planIds:ROTATION[v].slice()};save();render();toast(v==='off'?'Rotation aus':'Rotation: '+v+' Tage');break;}
     case'plannew':ui.editPlanId=null;ui.planDraft={name:''};ui.modal='plannew';ui.focus='planName';renderModal();break;
     case'planedit':{var ep=plan(ui.activePlanId);if(!ep)break;ui.editPlanId=ep.id;ui.planDraft={name:ep.name};ui.modal='plannew';ui.focus='planName';renderModal();break;}
