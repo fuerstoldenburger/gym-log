@@ -1138,10 +1138,17 @@ function download(filename,text,type){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();
   setTimeout(function(){URL.revokeObjectURL(url);a.remove();},500);
 }
+function exportPayload(){
+  return {app:'gym-log',version:3,exportedAt:new Date().toISOString(),exercises:data.exercises,sets:data.sets,plans:data.plans,body:data.body,schedule:data.schedule,migrations:data.migrations};
+}
 function exportJson(){
-  var payload={app:'gym-log',version:2,exportedAt:new Date().toISOString(),exercises:data.exercises,sets:data.sets,plans:data.plans,body:data.body};
-  download('gymlog-backup-'+dayKey(new Date())+'.json',JSON.stringify(payload,null,2));
+  download('gymlog-backup-'+dayKey(new Date())+'.json',JSON.stringify(exportPayload(),null,2));
   toast('Backup exportiert');
+}
+function applyImport(p){
+  data={exercises:p.exercises,sets:p.sets,plans:(p.plans&&p.plans.length)?p.plans:defaultPlans(),body:p.body||[],
+        schedule:p.schedule||emptySchedule(),migrations:p.migrations||{}};
+  migrate();save();
 }
 function exportCsv(){
   var byId={};data.exercises.forEach(function(e){byId[e.id]=e;});
@@ -1163,7 +1170,7 @@ document.getElementById('fileIn').addEventListener('change',function(ev){
     try{var p=JSON.parse(r.result);
       if(!p.sets||!p.exercises)throw 0;
       if(!confirm('Backup importieren? Deine aktuellen Daten werden ersetzt.\n\nGefunden: '+p.exercises.length+' Übungen, '+p.sets.length+' Sätze.'))return;
-      data={exercises:p.exercises,sets:p.sets,plans:(p.plans&&p.plans.length)?p.plans:defaultPlans(),body:p.body||[]};migrate();save();ui.modal=null;ui.view='home';render();toast('Backup wiederhergestellt');
+      applyImport(p);ui.modal=null;ui.view='home';render();toast('Backup wiederhergestellt');
     }catch(e){alert('Diese Datei konnte nicht gelesen werden. Bitte eine gültige Gym-Log-Sicherung (.json) wählen.');}
   };r.readAsText(f);ev.target.value='';
 });

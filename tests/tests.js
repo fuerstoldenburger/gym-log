@@ -141,5 +141,15 @@ data.sets=[{id:'p1',exerciseId:'plank',date:'2026-09-20',ts:1,weight:0,mode:'tim
 ui.origin='plan'; ui.activePlanId='plan-gk-b'; ui.draft=null; ensureDraft(ex('plank')); applyTargetPrefill(ex('plank'),T2);
 check('time prefill seconds', ui.draft.seconds===75);
 
+section('export / import');
+fresh(); data.schedule={mode:'4',planIds:ROTATION['4'].slice()};
+var payload=exportPayload();
+check('payload v3 with schedule', payload.version===3 && payload.schedule.mode==='4' && payload.migrations.rotation2609===true);
+var v2={app:'gym-log',version:2,exercises:DEFAULTS.slice(0,5),sets:[],plans:defaultPlans(),body:[]};
+applyImport(v2);
+check('v2 import gets empty schedule and seeds', data.schedule.mode===null && !!plan('plan-gk-a') && data.migrations.rotation2609===true);
+applyImport(payload);
+check('v3 import keeps schedule', data.schedule.mode==='4' && data.plans.filter(function(p){return p.id==='plan-un-1';}).length===1);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');
