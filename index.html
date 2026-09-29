@@ -124,6 +124,8 @@
   .hintSub{font-size:11.5px;color:var(--muted);margin-top:8px;padding:0 2px}
 
   .planCard{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:left;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+  .dueTag{font-size:11px;font-weight:700;color:var(--bg);background:var(--accent);border-radius:10px;padding:2px 8px;margin-left:8px;white-space:nowrap}
+  .secHeadPlans{font-family:var(--display);font-size:11px;letter-spacing:2px;color:var(--muted);margin:16px 2px 8px}
   .planCard.add{border-style:dashed;background:transparent;color:var(--accent);justify-content:center;font-size:14px;font-weight:600;gap:8px}
   .planName{font-size:16px;font-weight:700}
   .planMeta{font-size:12.5px;color:var(--muted);margin-top:3px}
@@ -582,21 +584,31 @@ function planDoneCount(p,today){
   return p.exIds.filter(function(eid){return data.sets.some(function(s){return s.exerciseId===eid&&s.date===today;});}).length;
 }
 function viewPlans(){
-  var today=dayKey(new Date());
-  var cards=data.plans.map(function(p){
-    var done=planDoneCount(p,today);
+  var today=dayKey(new Date()),st=todayPlanState(today);
+  var dueId=st.kind==='today'?st.planId:(st.kind==='done'?st.nextId:(st.kind==='next'?st.planId:null));
+  function card(p){
+    var done=planDoneCount(p,today),due=p.id===dueId;
     return `<button class="planCard tap" data-a="planopen" data-id="${p.id}">
-      <div><div class="planName">${esc(p.name)}</div>
+      <div style="min-width:0"><div class="planName">${esc(p.name)}${due?'<span class="dueTag">'+(st.kind==='today'?'heute':'als Nächstes')+'</span>':''}</div>
       <div class="planMeta">${p.exIds.length} ${p.exIds.length===1?'Übung':'Übungen'}${done?' · heute '+done+' trainiert':''}</div></div>
       <div class="planProg">${done?done+'/'+p.exIds.length:''}</div>
       ${ico('chevright',18,'#8C8895')}
     </button>`;
-  }).join('');
+  }
+  var mode=data.schedule.mode||'off';
+  var ctrl=`<div class="modeToggle" style="margin:0 0 14px">${[['3','3 Tage'],['4','4 Tage'],['off','Aus']].map(function(o){
+    return `<button class="modeBtn tap${mode===o[0]?' on':''}" data-a="rotmode" data-v="${o[0]}">${o[1]}</button>`;}).join('')}</div>`;
+  var rot=data.schedule.planIds.map(function(id){var p=plan(id);return p?card(p):'';}).join('');
+  var others=data.plans.filter(function(p){return data.schedule.planIds.indexOf(p.id)<0;}).map(card).join('');
+  var hint=mode==='3'?'Ganzkörper A, B, C im Wechsel. Der nächste Tag folgt auf den zuletzt trainierten.':(mode==='4'?'Ober und Unter im Wechsel, Beine zweimal pro Runde.':'Keine Rotation. Wähle 3 oder 4 Tage, dann sagt dir die Startseite, was dran ist.');
   return `<div class="header">
      <div><div class="eyebrow">TRAININGSPLÄNE</div><div class="dateBig">Deine Routinen</div></div>
      <div class="top-icons"><button class="icon-btn tap" data-a="menu" aria-label="Menü — Daten &amp; Sicherung">${ico('menu',22,'#8C8895')}</button>${ico('clipboard',24,'#F5C518')}</div>
    </div>
-   ${cards}
+   ${ctrl}<div class="hintSub" style="margin:-6px 2px 12px">${hint}</div>
+   ${rot}
+   ${rot?'<div class="secHeadPlans">WEITERE PLÄNE</div>':''}
+   ${others}
    <button class="planCard add tap" data-a="plannew">${ico('plus',18,'#F5C518')} Neuen Plan anlegen</button>
    ${navBar('plans')}`;
 }
@@ -607,13 +619,16 @@ function viewPlan(){
   var done=planDoneCount(p,today);
   var rows=p.exIds.map(function(eid){
     var e=ex(eid);if(!e||e.archived)return'';
-    var l=lastBy[eid],doneToday=data.sets.some(function(s){return s.exerciseId===eid&&s.date===today;});
-    var last=l?(isCardio(l)?'<b>'+nf1(l.km||0)+' km</b>':(isTime(l)?'<b>'+fmtTimeShort(l.seconds)+'</b>':(l.weight>0?'<b>'+l.weight+'</b> kg × '+l.reps:'<b>'+l.reps+'</b> Wdh.'))):'neu';
+    var doneToday=data.sets.some(function(s){return s.exerciseId===eid&&s.date===today;});
+    var sg=suggestFor(p,eid,today);
+    var tgt=fmtTarget(sg,e).replace(/(\d+(?:\.\d+)?) kg$/,'<b>$1</b> kg')+(sg.up?' <span style="color:var(--accent)">↑</span>':'');
+    var l=lastBy[eid];
+    var last=l?(isCardio(l)?nf1(l.km||0)+' km':(isTime(l)?fmtTimeShort(l.seconds):(l.weight>0?l.weight+' × '+l.reps:l.reps+' Wdh.'))):'';
     return `<div class="planRow">
       <button class="planRowBtn tap" data-a="open" data-id="${eid}">
         ${doneToday?'<span class="planRowDot"></span>':'<span class="planRowDot" style="background:var(--line)"></span>'}
         <div><div class="planRowName">${e.fav?'<span style="color:var(--accent);font-size:10px">★</span> ':''}${esc(e.name)}</div>
-        <div class="planRowMeta">${esc(e.group)} · ${last}</div></div>
+        <div class="planRowMeta">Ziel ${tgt}${last?' · zuletzt '+last:''}</div></div>
       </button>
       <button class="delBtn tap" data-a="planremex" aria-label="Aus Plan entfernen" data-id="${eid}">${ico('x',16,'#8C8895')}</button>
     </div>`;
@@ -1188,6 +1203,7 @@ document.addEventListener('click',function(ev){
     case'favtoggle':{var fe=ex(ui.activeId);fe.fav=!fe.fav;save();render();toast(fe.fav?'Als Favorit markiert':'Favorit entfernt');break;}
     case'planopen':ui.activePlanId=id;go('plan');break;
     case'planback':go('plans');break;
+    case'rotmode':{data.schedule=v==='off'?emptySchedule():{mode:v,planIds:ROTATION[v].slice()};save();render();toast(v==='off'?'Rotation aus':'Rotation: '+v+' Tage');break;}
     case'plannew':ui.editPlanId=null;ui.planDraft={name:''};ui.modal='plannew';ui.focus='planName';renderModal();break;
     case'planedit':{var ep=plan(ui.activePlanId);if(!ep)break;ui.editPlanId=ep.id;ui.planDraft={name:ep.name};ui.modal='plannew';ui.focus='planName';renderModal();break;}
     case'plansubmit':{var pn=(document.getElementById('planName').value||'').trim();if(!pn)return;

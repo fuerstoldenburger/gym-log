@@ -102,5 +102,18 @@ data.sets=plan('plan-gk-b').exIds.map(function(id,i){return {id:'d'+i,exerciseId
 st=todayPlanState(T); check('today complete -> done with next C', st.kind==='done' && st.nextId==='plan-gk-c');
 data.schedule=emptySchedule(); check('schedule off', todayPlanState(T).kind==='off' && nextPlanId(T)===null);
 
+section('plans screen');
+fresh(); ui.view='plans';
+var h=viewPlans();
+check('rotation control rendered', h.indexOf('data-a="rotmode" data-v="3"')>=0 && h.indexOf('data-v="off"')>=0);
+check('off: no due tag', h.indexOf('als Nächstes')<0);
+data.schedule={mode:'3',planIds:ROTATION['3'].slice()}; h=viewPlans();
+check('due tag on first plan', h.indexOf('als Nächstes')>=0 && h.indexOf('Ganzkörper A')<h.indexOf('als Nächstes'));
+check('custom plans listed under Weitere', h.indexOf('WEITERE PLÄNE')>=0 && h.indexOf('Push')>h.indexOf('WEITERE PLÄNE'));
+ui.activePlanId='plan-gk-a'; data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3)];
+var hp=viewPlan();
+check('plan row shows target with up arrow', hp.indexOf('3 × 10–15 · <b>65</b> kg')>=0 && hp.indexOf('↑')>=0);
+check('plan row first time', hp.indexOf('erstes Mal')>=0);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');
