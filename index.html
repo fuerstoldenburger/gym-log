@@ -210,7 +210,16 @@ var DEFAULTS=[
  ['bizeps','Bizeps-Curls','Arme',false,'reps'],['trizeps','Trizeps-Drücken','Arme',false,'reps'],
  ['crunches','Crunches','Bauch',true,'reps'],['plank','Plank','Bauch',true,'time'],
  ['seitstuetz','Seitstütz','Bauch',true,'time'],
- ['laufband','Laufband','Cardio',true,'cardio']
+ ['laufband','Laufband','Cardio',true,'cardio'],
+ ['schraeg-kh','Schrägbank Kurzhantel','Brust',false,'reps'],['goodmorning','Good mornings','Beine',false,'reps'],
+ ['trizeps-oh','Triceps overhead','Arme',false,'reps'],['seilpull','Rücken Seil pull','Rücken',false,'reps'],
+ ['bizeps-kh','Bizeps Krummhantel','Arme',false,'reps'],['hangraise','Hang raise','Bauch',true,'reps'],
+ ['schulter-lh','Schulterdrücken Langhantel','Schulter',false,'reps'],['liegestuetz','Liegestütze','Brust',true,'reps'],
+ ['rudern-maschine','Rudern Maschine','Rücken',false,'reps'],['kh-rows','Kurzhantel bent rows','Rücken',false,'reps'],
+ ['burpees','Burpees','Cardio',true,'reps'],['kettlebell','Full kettlebell workout','Cardio',true,'time'],
+ ['kniebeuge-g','Geführte Kniebeuge','Beine',false,'reps'],['bizeps-turm','Bizeps pull up turm','Arme',false,'reps'],
+ ['latzug-h','Horizontal lat Zug','Rücken',false,'reps'],['hintere-schulter','Angled Bank hintere Schulter','Schulter',false,'reps'],
+ ['rudern-schraeg','Rudern schräg Maschine','Rücken',false,'reps']
 ].map(function(a){return {id:a[0],name:a[1],group:a[2],bw:a[3],mode:a[4]};});
 
 function defaultPlans(){
@@ -221,15 +230,52 @@ function defaultPlans(){
   ];
 }
 var KEY='gymlog-v1';
-var data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[]};
+function emptySchedule(){return {mode:null,planIds:[]};}
+var data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[],schedule:emptySchedule(),migrations:{}};
 function load(){try{var r=localStorage.getItem(KEY);if(r){var p=JSON.parse(r);data={
   exercises:(p.exercises&&p.exercises.length)?p.exercises:DEFAULTS.slice(),
   sets:p.sets||[],
   plans:(p.plans&&p.plans.length)?p.plans:defaultPlans(),
-  body:p.body||[]};}}catch(e){}migrate();}
+  body:p.body||[],
+  schedule:p.schedule||emptySchedule(),
+  migrations:p.migrations||{}};}}catch(e){}migrate();}
+function normName(s){return String(s||'').toLowerCase().trim().replace(/\s+/g,' ');}
+function resolveByName(name){
+  var n=normName(name);
+  var hit=data.exercises.filter(function(e){return normName(e.name)===n;});
+  if(hit.length){var live=hit.filter(function(e){return !e.archived;});return (live[0]||hit[0]).id;}
+  var d=DEFAULTS.find(function(e){return normName(e.name)===n;});
+  return d?d.id:null;
+}
+function isDefaultId(id){return DEFAULTS.some(function(d){return d.id===id;});}
 function migrate(){
+  if(!data.schedule)data.schedule=emptySchedule();
+  if(!data.migrations)data.migrations={};
   if(!data.exercises.some(function(e){return e.id==='laufband'||e.mode==='cardio';}))
     data.exercises.push({id:'laufband',name:'Laufband',group:'Cardio',bw:true,mode:'cardio'});
+  migrate2609();
+}
+function migrate2609(){
+  if(data.migrations.rotation2609)return;
+  /* 1. rename before matching */
+  data.exercises.forEach(function(e){if(normName(e.name)==='schulterfreien langhantel'){e.name='Schulterdrücken Langhantel';e.group='Schulter';}});
+  /* 2. group fixes by name */
+  var fix={'rücken seil pull':'Rücken','bizeps krummhantel':'Arme'};
+  data.exercises.forEach(function(e){var g=fix[normName(e.name)];if(g)e.group=g;});
+  /* 3. add missing defaults by name */
+  DEFAULTS.forEach(function(d){
+    if(!data.exercises.some(function(e){return normName(e.name)===normName(d.name);}))
+      data.exercises.push({id:d.id,name:d.name,group:d.group,bw:d.bw,mode:d.mode});
+  });
+  /* 4. archive duplicates without sets (keep the one with sets, else the built-in one, else the first) */
+  var seen={};
+  data.exercises.forEach(function(e){
+    var n=normName(e.name);if(e.archived)return;
+    if(!seen[n]){seen[n]=e;return;}
+    var a=seen[n],b=e,na=setsFor(a.id).length,nb=setsFor(b.id).length;
+    if(nb>na||(nb===na&&isDefaultId(b.id)&&!isDefaultId(a.id))){a.archived=true;seen[n]=b;}else{b.archived=true;}
+  });
+  data.migrations.rotation2609=true;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
 
