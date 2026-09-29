@@ -341,7 +341,7 @@ function kcalForDay(k){
 /* ============ ui state ============ */
 var ui={view:'home',activeId:null,filter:'Alle',query:'',focus:null,
         draft:null, modal:null, tlAll:false, watch:{running:false,elapsed:0,int:null,start:0},
-        scrollPos:{}, undo:null};
+        scrollPos:{}, undo:null, prefilled:{}};
 var GROUPS=['Alle','Brust','Rücken','Beine','Schulter','Arme','Bauch','Cardio'];
 
 function ex(id){return data.exercises.find(function(e){return e.id===id;});}
@@ -844,6 +844,22 @@ function ensureDraft(e){
   }
   return ui.draft;
 }
+function applyTargetPrefill(e,todayKey){
+  if(ui.origin!=='plan'||!ui.activePlanId||!ui.draft||ui.draft.exId!==e.id)return;
+  if(ui.prefilled[e.id]===todayKey)return;
+  var p=plan(ui.activePlanId);if(!p||p.exIds.indexOf(e.id)<0)return;
+  var s=suggestFor(p,e.id,todayKey);
+  if(isTime(e)){if(s.seconds)ui.draft.seconds=s.seconds;}
+  else if(!isCardio(e)){if(s.weight!==null)ui.draft.weight=s.weight;if(s.repMin)ui.draft.reps=s.repMin;}
+  ui.prefilled[e.id]=todayKey;
+}
+function targetLine(e,todayKey){
+  if(ui.origin!=='plan'||!ui.activePlanId)return'';
+  var p=plan(ui.activePlanId);if(!p||p.exIds.indexOf(e.id)<0)return'';
+  var s=suggestFor(p,e.id,todayKey);
+  var extra=s.up?' <span style="color:var(--accent)">(+'+ruleFor(p,e.id).incr+' kg, Ziel erreicht)</span>':'';
+  return '<div class="lastRef">'+ico('trend',13,'#F5C518')+'<span>Ziel: <b>'+fmtTarget(s,e)+'</b>'+extra+'</span></div>';
+}
 function viewLog(){
   var e=ex(ui.activeId);if(!e)return'';
   var timed=isTime(e),cardio=isCardio(e),d=ensureDraft(e),today=dayKey(new Date());
@@ -925,6 +941,7 @@ function viewLog(){
      <div class="eyebrow">${esc(e.group.toUpperCase())}${timed?' · ZEIT':''}${cardio?' · DISTANZ + ZEIT':''}</div>
      <h1 class="logTitle">${esc(e.name)}</h1>
      ${refLine()}
+     ${targetLine(e,today)}
    </div>
    ${cardio?`
    <div class="control">
@@ -1167,7 +1184,7 @@ function go(view,id){
   stopWatchSilently();
   ui.scrollPos[ui.view]=window.scrollY||0;
   ui.view=view;if(id!==undefined)ui.activeId=id;
-  if(view==='log'){var e=ex(ui.activeId);ensureDraft(e);}
+  if(view==='log'){var e=ex(ui.activeId);ensureDraft(e);applyTargetPrefill(e,dayKey(new Date()));}
   render();
   /* Listen-Ansichten merken sich die Scroll-Position, Detail-Ansichten starten oben */
   var keep=(view==='home'||view==='plans'||view==='progress');

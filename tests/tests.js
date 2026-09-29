@@ -124,5 +124,22 @@ data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
 data.sets=plan('plan-gk-a').exIds.map(function(id,i){return {id:'d'+i,exerciseId:id,date:dayKey(new Date()),ts:i,weight:10,mode:'reps',reps:10};});
 check('home card done state', viewHome().indexOf('ERLEDIGT')>=0 && viewHome().indexOf('Ganzkörper B')>=0);
 
+section('logger prefill');
+fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+var T2=dayKey(new Date());
+data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3)];
+ui.origin='home'; ui.activePlanId='plan-gk-a'; ui.draft=null; ensureDraft(ex('beinpresse')); applyTargetPrefill(ex('beinpresse'),T2);
+check('no prefill from home', ui.draft.weight===60 && ui.draft.reps===15);
+ui.origin='plan'; ui.draft=null; ensureDraft(ex('beinpresse')); applyTargetPrefill(ex('beinpresse'),T2);
+check('prefill from plan: +5 and repMin', ui.draft.weight===65 && ui.draft.reps===10);
+ui.draft.weight=70; applyTargetPrefill(ex('beinpresse'),T2);
+check('no overwrite same day', ui.draft.weight===70);
+ui.activeId='beinpresse'; var hl=viewLog();
+check('target line rendered', hl.indexOf('Ziel')>=0 && hl.indexOf('65 kg')>=0 && hl.indexOf('Ziel erreicht')>=0);
+ui.origin='home'; check('no target line from home', viewLog().indexOf('Ziel')<0);
+data.sets=[{id:'p1',exerciseId:'plank',date:'2026-09-20',ts:1,weight:0,mode:'time',seconds:75}];
+ui.origin='plan'; ui.activePlanId='plan-gk-b'; ui.draft=null; ensureDraft(ex('plank')); applyTargetPrefill(ex('plank'),T2);
+check('time prefill seconds', ui.draft.seconds===75);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');
