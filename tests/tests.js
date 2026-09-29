@@ -38,5 +38,21 @@ check('second Butterfly archived', ex('ex-7').archived===true && !ex('butterfly'
 var n1=data.exercises.length; migrate(); check('idempotent', data.exercises.length===n1);
 check('resolveByName unknown is null', resolveByName('Gibt es nicht')===null);
 
+section('seeded plans');
+fresh();
+check('seven plans seeded', ['plan-gk-a','plan-gk-b','plan-gk-c','plan-ob-1','plan-un-1','plan-ob-2','plan-un-2'].every(function(id){return !!plan(id);}));
+check('old plans kept', !!plan('plan-push'));
+check('GK A order legs first', plan('plan-gk-a').exIds[0]==='beinpresse');
+check('GK A targets keyed by id', plan('plan-gk-a').targets['beinpresse'].repMax===15 && plan('plan-gk-a').targets['beinpresse'].incr===5);
+check('GK C deadlift heavy rule', plan('plan-gk-c').targets['kreuz'].repMin===5 && plan('plan-gk-c').targets['kreuz'].incr===5);
+check('GK C bench heavy rule', plan('plan-gk-c').targets['bank'].repMax===8 && plan('plan-gk-c').targets['bank'].incr===2.5);
+check('no free-bar squat in seeds', SEED_PLANS.every(function(p){return p.rows.every(function(r){return normName(r[0])!=='kniebeugen';});}));
+check('ROTATION 3 and 4', ROTATION['3'].length===3 && ROTATION['4'].length===4);
+localStorage.clear();
+data={exercises:DEFAULTS.filter(function(e){return e.id!=='schraeg-kh';}).concat([{id:'ex-1',name:'Schrägbank Kurzhantel',group:'Brust',bw:false,mode:'reps'}]),sets:[],plans:defaultPlans(),body:[]};
+migrate();
+check('seed uses existing ids', plan('plan-gk-a').exIds.indexOf('ex-1')>=0 && plan('plan-gk-a').exIds.indexOf('schraeg-kh')<0);
+var pc=data.plans.length; migrate(); check('seed idempotent', data.plans.length===pc);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');

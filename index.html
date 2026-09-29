@@ -229,6 +229,27 @@ function defaultPlans(){
     {id:'plan-beine',name:'Beine',exIds:['kniebeuge','beinpresse','beinstrecker','beinbeuger','waden']}
   ];
 }
+var RULES={U:{sets:3,repMin:8,repMax:12,incr:2.5},L:{sets:3,repMin:10,repMax:15,incr:5},
+  H:{sets:3,repMin:5,repMax:8,incr:2.5},HL:{sets:3,repMin:5,repMax:8,incr:5},
+  LIGHT:{sets:3,repMin:12,repMax:15,incr:2.5},BW:{sets:3,repMin:10,repMax:15,incr:0},T:{sets:3}};
+var SEED_PLANS=[
+  {id:'plan-gk-a',name:'Ganzkörper A',rows:[['Beinpresse','L'],['Schrägbank Kurzhantel','U'],['Latzug','U'],['Good mornings','L'],['Schulterdrücken','U'],['Hang raise','BW']]},
+  {id:'plan-gk-b',name:'Ganzkörper B',rows:[['Geführte Kniebeuge','L'],['Schrägbankdrücken','U'],['Rudern schräg Maschine','U'],['Beinbeuger','L'],['Trizeps-Drücken','U'],['Plank','T']]},
+  {id:'plan-gk-c',name:'Ganzkörper C',rows:[['Kreuzheben','HL'],['Bankdrücken','H'],['Langhantelrudern','U'],['Beinstrecker','LIGHT'],['Bizeps-Curls','U'],['Dead Hang','T']]},
+  {id:'plan-ob-1',name:'Ober 1',rows:[['Schrägbank Kurzhantel','U'],['Schrägbankdrücken','U'],['Schulterdrücken','U'],['Seitheben','U'],['Trizeps-Drücken','U'],['Triceps overhead','U']]},
+  {id:'plan-un-1',name:'Unter 1',rows:[['Beinpresse','L'],['Geführte Kniebeuge','L'],['Beinstrecker','LIGHT'],['Wadenheben','L'],['Wall Sit','T'],['Plank','T']]},
+  {id:'plan-ob-2',name:'Ober 2',rows:[['Latzug','U'],['Rudern schräg Maschine','U'],['Langhantelrudern','U'],['Rücken Seil pull','U'],['Bizeps-Curls','U'],['Hang raise','BW'],['Dead Hang','T']]},
+  {id:'plan-un-2',name:'Unter 2',rows:[['Kreuzheben','HL'],['Good mornings','L'],['Beinbeuger','L'],['Wadenheben','L'],['Hang raise','BW'],['Seitstütz','T']]}
+];
+var ROTATION={'3':['plan-gk-a','plan-gk-b','plan-gk-c'],'4':['plan-ob-1','plan-un-1','plan-ob-2','plan-un-2']};
+function seedPlans(){
+  SEED_PLANS.forEach(function(sp){
+    if(plan(sp.id))return;
+    var p={id:sp.id,name:sp.name,exIds:[],targets:{}};
+    sp.rows.forEach(function(r){var id=resolveByName(r[0]);if(!id||p.exIds.indexOf(id)>=0)return;p.exIds.push(id);p.targets[id]=Object.assign({},RULES[r[1]]);});
+    data.plans.push(p);
+  });
+}
 var KEY='gymlog-v1';
 function emptySchedule(){return {mode:null,planIds:[]};}
 var data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[],schedule:emptySchedule(),migrations:{}};
@@ -275,6 +296,7 @@ function migrate2609(){
     var a=seen[n],b=e,na=setsFor(a.id).length,nb=setsFor(b.id).length;
     if(nb>na||(nb===na&&isDefaultId(b.id)&&!isDefaultId(a.id))){a.archived=true;seen[n]=b;}else{b.archived=true;}
   });
+  seedPlans();
   data.migrations.rotation2609=true;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
