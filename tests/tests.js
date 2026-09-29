@@ -40,14 +40,15 @@ check('resolveByName unknown is null', resolveByName('Gibt es nicht')===null);
 
 section('seeded plans');
 fresh();
-check('seven plans seeded', ['plan-gk-a','plan-gk-b','plan-gk-c','plan-ob-1','plan-un-1','plan-ob-2','plan-un-2'].every(function(id){return !!plan(id);}));
+check('eight plans seeded', ['plan-gk-a','plan-gk-b','plan-gk-c','plan-gk-d','plan-ob-1','plan-un-1','plan-ob-2','plan-un-2'].every(function(id){return !!plan(id);}));
 check('old plans kept', !!plan('plan-push'));
 check('GK A order legs first', plan('plan-gk-a').exIds[0]==='beinpresse');
 check('GK A targets keyed by id', plan('plan-gk-a').targets['beinpresse'].repMax===15 && plan('plan-gk-a').targets['beinpresse'].incr===5);
 check('GK C deadlift heavy rule', plan('plan-gk-c').targets['kreuz'].repMin===5 && plan('plan-gk-c').targets['kreuz'].incr===5);
 check('GK C bench heavy rule', plan('plan-gk-c').targets['bank'].repMax===8 && plan('plan-gk-c').targets['bank'].incr===2.5);
 check('no free-bar squat in seeds', SEED_PLANS.every(function(p){return p.rows.every(function(r){return normName(r[0])!=='kniebeugen';});}));
-check('ROTATION 3 and 4', ROTATION['3'].length===3 && ROTATION['4'].length===4);
+check('ROTATION_WEEK A B C D', ROTATION_WEEK.join()==='plan-gk-a,plan-gk-b,plan-gk-c,plan-gk-d');
+check('plan D seeded legs extra', !!plan('plan-gk-d') && plan('plan-gk-d').name==='Beine extra' && plan('plan-gk-d').exIds[0]==='beinpresse');
 localStorage.clear();
 data={exercises:DEFAULTS.filter(function(e){return e.id!=='schraeg-kh';}).concat([{id:'ex-1',name:'Schrägbank Kurzhantel',group:'Brust',bw:false,mode:'reps'}]),sets:[],plans:defaultPlans(),body:[]};
 migrate();
@@ -87,28 +88,42 @@ check('fmtTarget zero weight reads Körpergewicht', fmtTarget({sets:3,repMin:10,
 check('fmtTarget time', fmtTarget({sets:3,seconds:75,weight:null,first:false},ex('plank'))==='3 × 1:15');
 
 section('rotation');
-fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
-var T='2026-09-29';
-check('next: no history -> first', nextPlanId(T)==='plan-gk-a');
+fresh(); data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
+var T='2026-10-01';
+check('next: no history -> A', nextPlanId(T)==='plan-gk-a');
 check('state next', todayPlanState(T).kind==='next' && todayPlanState(T).planId==='plan-gk-a');
-data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1)];
-check('after A -> B', nextPlanId(T)==='plan-gk-b');
-data.sets=[mk('beinpresse','2026-09-20',60,12,1)];
-check('one exercise does not count', nextPlanId(T)==='plan-gk-a' && planDayOf('2026-09-20')===null);
-data.sets=[mk('kreuz','2026-09-25',80,8,1),mk('bank','2026-09-25',60,8,1)];
-check('after C -> A (wrap)', nextPlanId(T)==='plan-gk-a');
-data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1),mk('kniebeuge-g','2026-09-29',40,12,1),mk('schraeg','2026-09-29',50,10,1)];
-var st=todayPlanState(T); check('today matched B with done 2/6', st.kind==='today' && st.planId==='plan-gk-b' && st.done===2 && st.total===6);
-data.sets=plan('plan-gk-b').exIds.map(function(id,i){return {id:'d'+i,exerciseId:id,date:'2026-09-29',ts:i,weight:10,mode:'reps',reps:10};});
-st=todayPlanState(T); check('today complete -> done with next C', st.kind==='done' && st.nextId==='plan-gk-c');
+data.sets=[mk('beinpresse','2026-09-28',60,12,1),mk('latzug','2026-09-28',50,12,1)];
+check('A this week -> B', nextPlanId(T)==='plan-gk-b');
+data.sets=data.sets.concat([mk('kniebeuge-g','2026-09-29',40,12,1),mk('schraeg','2026-09-29',50,10,1)]);
+check('A,B this week -> C', nextPlanId(T)==='plan-gk-c');
+data.sets=data.sets.concat([mk('kreuz','2026-09-30',80,8,1),mk('bank','2026-09-30',60,8,1)]);
+check('A,B,C this week -> D', nextPlanId(T)==='plan-gk-d');
+data.sets=data.sets.concat([mk('beinbeuger','2026-10-01',30,12,1),mk('waden','2026-10-01',40,15,1),mk('beinstrecker','2026-10-01',20,15,1)]);
+var st=todayPlanState(T); check('today matched D 3/6', st.kind==='today' && st.planId==='plan-gk-d' && st.done===3 && st.total===6);
+data.sets=data.sets.concat(plan('plan-gk-d').exIds.map(function(id,i){return {id:'dd'+i,exerciseId:id,date:'2026-10-01',ts:100+i,weight:10,mode:'reps',reps:10};}));
+st=todayPlanState(T); check('all four done -> next A', st.kind==='done' && st.nextId==='plan-gk-a');
+data.sets=[mk('kreuz','2026-09-27',80,8,1),mk('bank','2026-09-27',60,8,1)];
+check('last week C does not count -> A', nextPlanId(T)==='plan-gk-a');
+data.sets=[mk('kniebeuge-g','2026-09-28',40,12,1),mk('schraeg','2026-09-28',50,10,1)];
+check('B first this week -> A is still due', nextPlanId(T)==='plan-gk-a');
+data.sets=[mk('beinpresse','2026-09-28',60,12,1)];
+check('one exercise does not count', nextPlanId(T)==='plan-gk-a' && planDayOf('2026-09-28')===null);
 data.schedule=emptySchedule(); check('schedule off', todayPlanState(T).kind==='off' && nextPlanId(T)===null);
+// migration from the old 3/4 modes
+localStorage.clear(); data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[],schedule:{mode:'3',planIds:['plan-gk-a','plan-gk-b','plan-gk-c']},migrations:{rotation2609:true}};
+migrate();
+check('mode 3 becomes week with D', data.schedule.mode==='week' && data.schedule.planIds.join()===ROTATION_WEEK.join() && !!plan('plan-gk-d'));
+localStorage.clear(); data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[],schedule:{mode:'4',planIds:['plan-ob-1']},migrations:{rotation2609:true}};
+migrate(); check('mode 4 becomes week', data.schedule.mode==='week' && data.schedule.planIds.length===4);
+localStorage.clear(); data={exercises:DEFAULTS.slice(),sets:[],plans:defaultPlans(),body:[],schedule:emptySchedule(),migrations:{rotation2609:true}};
+migrate(); check('mode off stays off', data.schedule.mode===null);
 
 section('plans screen');
 fresh(); ui.view='plans';
 var h=viewPlans();
-check('rotation control rendered', h.indexOf('data-a="rotmode" data-v="3"')>=0 && h.indexOf('data-v="off"')>=0);
+check('rotation control rendered', h.indexOf('data-a="rotmode" data-v="week"')>=0 && h.indexOf('data-v="off"')>=0 && h.indexOf('data-v="3"')<0);
 check('off: no due tag', h.indexOf('als Nächstes')<0);
-data.schedule={mode:'3',planIds:ROTATION['3'].slice()}; h=viewPlans();
+data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()}; h=viewPlans();
 check('due tag on first plan', h.indexOf('als Nächstes')>=0 && h.indexOf('Ganzkörper A')<h.indexOf('als Nächstes'));
 check('custom plans listed under Weitere', h.indexOf('WEITERE PLÄNE')>=0 && h.indexOf('Push')>h.indexOf('WEITERE PLÄNE'));
 ui.activePlanId='plan-gk-a'; data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3)];
@@ -118,15 +133,15 @@ check('plan row first time', hp.indexOf('erstes Mal')>=0);
 
 section('home card');
 fresh(); ui.view='home';
-check('home card empty history', (function(){data.schedule={mode:'3',planIds:ROTATION['3'].slice()};var h=viewHome();return h.indexOf('HEUTE DRAN')>=0&&h.indexOf('Ganzkörper A')>=0&&h.indexOf('erstes Mal')>=0;})());
+check('home card empty history', (function(){data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};var h=viewHome();return h.indexOf('HEUTE DRAN')>=0&&h.indexOf('Ganzkörper A')>=0&&h.indexOf('erstes Mal')>=0;})());
 check('home card lists three exercises', (viewHome().match(/dayEx/g)||[]).length===3);
 data.schedule=emptySchedule(); check('no card when off', viewHome().indexOf('HEUTE DRAN')<0);
-data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
 data.sets=plan('plan-gk-a').exIds.map(function(id,i){return {id:'d'+i,exerciseId:id,date:dayKey(new Date()),ts:i,weight:10,mode:'reps',reps:10};});
 check('home card done state', viewHome().indexOf('ERLEDIGT')>=0 && viewHome().indexOf('Ganzkörper B')>=0);
 
 section('logger prefill');
-fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+fresh(); data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
 var T2=dayKey(new Date());
 data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3)];
 ui.origin='home'; ui.activePlanId='plan-gk-a'; ui.draft=null; ensureDraft(ex('beinpresse')); applyTargetPrefill(ex('beinpresse'),T2);
@@ -143,14 +158,14 @@ ui.origin='plan'; ui.activePlanId='plan-gk-b'; ui.draft=null; ensureDraft(ex('pl
 check('time prefill seconds', ui.draft.seconds===75);
 
 section('export / import');
-fresh(); data.schedule={mode:'4',planIds:ROTATION['4'].slice()};
+fresh(); data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
 var payload=exportPayload();
-check('payload v3 with schedule', payload.version===3 && payload.schedule.mode==='4' && payload.migrations.rotation2609===true);
+check('payload v3 with schedule', payload.version===3 && payload.schedule.mode==='week' && payload.migrations.rotation2609===true);
 var v2={app:'gym-log',version:2,exercises:DEFAULTS.slice(0,5),sets:[],plans:defaultPlans(),body:[]};
 applyImport(v2);
 check('v2 import gets empty schedule and seeds', data.schedule.mode===null && !!plan('plan-gk-a') && data.migrations.rotation2609===true);
 applyImport(payload);
-check('v3 import keeps schedule', data.schedule.mode==='4' && data.plans.filter(function(p){return p.id==='plan-un-1';}).length===1);
+check('v3 import keeps schedule', data.schedule.mode==='week' && data.plans.filter(function(p){return p.id==='plan-gk-d';}).length===1);
 
 section('review fixes');
 // 1. renamed built-in must not get a duplicate id
@@ -158,13 +173,13 @@ localStorage.clear(); data={exercises:DEFAULTS.map(function(e){return Object.ass
 data.exercises.find(function(e){return e.id==='bank';}).name='Bench Press'; migrate();
 check('renamed built-in: no duplicate id', data.exercises.filter(function(e){return e.id==='bank';}).length===1 && !data.exercises.some(function(e){return e.name==='Bankdrücken';}));
 // 2. deleting a rotation plan keeps the pointer sane
-fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+fresh(); data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
 data.plans=data.plans.filter(function(p){return p.id!=='plan-gk-b';}); 
-data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1)];
-check('missing plan skipped in rotation', nextPlanId('2026-09-29')==='plan-gk-c' && todayPlanState('2026-09-29').planId==='plan-gk-c');
+data.sets=[mk('beinpresse','2026-09-28',60,12,1),mk('latzug','2026-09-28',50,12,1)];
+check('missing plan skipped in rotation', nextPlanId('2026-10-01')==='plan-gk-c' && todayPlanState('2026-10-01').planId==='plan-gk-c');
 check('home card survives a deleted plan', (function(){ui.view='home';return viewHome().indexOf('HEUTE DRAN')>=0;})());
 // 3. no prefill when a set exists today
-fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()}; var T3=dayKey(new Date());
+fresh(); data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()}; var T3=dayKey(new Date());
 data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3),mk('beinpresse',T3,62.5,10,1)];
 ui.origin='plan'; ui.activePlanId='plan-gk-a'; ui.draft=null; ui.prefilled={}; ensureDraft(ex('beinpresse')); applyTargetPrefill(ex('beinpresse'),T3);
 check('no prefill after reload when logged today', ui.draft.weight===62.5);

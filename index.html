@@ -241,12 +241,13 @@ var SEED_PLANS=[
   {id:'plan-gk-a',name:'Ganzkörper A',rows:[['Beinpresse','L'],['Schrägbank Kurzhantel','U'],['Latzug','U'],['Good mornings','L'],['Schulterdrücken','U'],['Hang raise','BW']]},
   {id:'plan-gk-b',name:'Ganzkörper B',rows:[['Geführte Kniebeuge','L'],['Schrägbankdrücken','U'],['Rudern schräg Maschine','U'],['Beinbeuger','L'],['Trizeps-Drücken','U'],['Plank','T']]},
   {id:'plan-gk-c',name:'Ganzkörper C',rows:[['Kreuzheben','HL'],['Bankdrücken','H'],['Langhantelrudern','U'],['Beinstrecker','LIGHT'],['Bizeps-Curls','U'],['Dead Hang','T']]},
+  {id:'plan-gk-d',name:'Beine extra',rows:[['Beinpresse','L'],['Beinbeuger','L'],['Beinstrecker','LIGHT'],['Wadenheben','L'],['Wall Sit','T'],['Seitstütz','T']]},
   {id:'plan-ob-1',name:'Ober 1',rows:[['Schrägbank Kurzhantel','U'],['Schrägbankdrücken','U'],['Schulterdrücken','U'],['Seitheben','U'],['Trizeps-Drücken','U'],['Triceps overhead','U']]},
   {id:'plan-un-1',name:'Unter 1',rows:[['Beinpresse','L'],['Geführte Kniebeuge','L'],['Beinstrecker','LIGHT'],['Wadenheben','L'],['Wall Sit','T'],['Plank','T']]},
   {id:'plan-ob-2',name:'Ober 2',rows:[['Latzug','U'],['Rudern schräg Maschine','U'],['Langhantelrudern','U'],['Rücken Seil pull','U'],['Bizeps-Curls','U'],['Hang raise','BW'],['Dead Hang','T']]},
   {id:'plan-un-2',name:'Unter 2',rows:[['Kreuzheben','HL'],['Good mornings','L'],['Beinbeuger','L'],['Wadenheben','L'],['Hang raise','BW'],['Seitstütz','T']]}
 ];
-var ROTATION={'3':['plan-gk-a','plan-gk-b','plan-gk-c'],'4':['plan-ob-1','plan-un-1','plan-ob-2','plan-un-2']};
+var ROTATION_WEEK=['plan-gk-a','plan-gk-b','plan-gk-c','plan-gk-d'];
 function seedPlans(){
   SEED_PLANS.forEach(function(sp){
     if(plan(sp.id))return;
@@ -280,6 +281,13 @@ function migrate(){
   if(!data.exercises.some(function(e){return e.id==='laufband'||e.mode==='cardio';}))
     data.exercises.push({id:'laufband',name:'Laufband',group:'Cardio',bw:true,mode:'cardio'});
   migrate2609();
+  migrateWeek();
+}
+function migrateWeek(){
+  if(data.migrations.week2609)return;
+  seedPlans();
+  if(data.schedule.mode==='3'||data.schedule.mode==='4')data.schedule={mode:'week',planIds:ROTATION_WEEK.slice()};
+  data.migrations.week2609=true;
 }
 function migrate2609(){
   if(data.migrations.rotation2609)return;
@@ -392,18 +400,24 @@ function lastPlanDayBefore(todayKey){
   for(var i=0;i<keys.length;i++){var pid=planDayOf(keys[i]);if(pid)return {date:keys[i],planId:pid};}
   return null;
 }
+function planIdsDoneThisWeek(todayKey){
+  var a=todayKey.split('-').map(Number),ws=weekStartKey(new Date(a[0],a[1]-1,a[2]));
+  var days={};data.sets.forEach(function(s){if(s.date<=todayKey&&s.date>=ws)days[s.date]=1;});
+  var done={},prev=null;
+  Object.keys(days).sort().forEach(function(k){var pid=planDayOf(k,prev);if(pid){done[pid]=1;prev=pid;}});
+  return done;
+}
+function firstNotDone(ids,done){for(var i=0;i<ids.length;i++)if(!done[ids[i]])return ids[i];return ids[0];}
 function nextPlanId(todayKey){
   var ids=rotationIds();if(!data.schedule.mode||!ids.length)return null;
-  var last=lastPlanDayBefore(todayKey);
-  if(!last)return ids[0];
-  return ids[(ids.indexOf(last.planId)+1)%ids.length];
+  return firstNotDone(ids,planIdsDoneThisWeek(todayKey));
 }
 function todayPlanState(todayKey){
   var ids=rotationIds();if(!data.schedule.mode||!ids.length)return {kind:'off'};
   var last=lastPlanDayBefore(todayKey);
   var todayId=planDayOf(todayKey,last?last.planId:null);
   if(todayId){var p=plan(todayId);var done=planDoneCount(p,todayKey);
-    if(done>=p.exIds.length)return {kind:'done',planId:todayId,nextId:ids[(ids.indexOf(todayId)+1)%ids.length]};
+    if(done>=p.exIds.length)return {kind:'done',planId:todayId,nextId:firstNotDone(ids,planIdsDoneThisWeek(todayKey))};
     return {kind:'today',planId:todayId,done:done,total:p.exIds.length};}
   return {kind:'next',planId:nextPlanId(todayKey)};
 }
@@ -615,11 +629,11 @@ function viewPlans(){
     </button>`;
   }
   var mode=data.schedule.mode||'off';
-  var ctrl=`<div class="modeToggle" style="margin:0 0 14px">${[['3','3 Tage'],['4','4 Tage'],['off','Aus']].map(function(o){
+  var ctrl=`<div class="modeToggle" style="margin:0 0 14px">${[['week','Rotation an'],['off','Aus']].map(function(o){
     return `<button class="modeBtn tap${mode===o[0]?' on':''}" data-a="rotmode" data-v="${o[0]}">${o[1]}</button>`;}).join('')}</div>`;
   var rot=data.schedule.planIds.map(function(id){var p=plan(id);return p?card(p):'';}).join('');
   var others=data.plans.filter(function(p){return data.schedule.planIds.indexOf(p.id)<0;}).map(card).join('');
-  var hint=mode==='3'?'Ganzkörper A, B, C im Wechsel. Der nächste Tag folgt auf den zuletzt trainierten.':(mode==='4'?'Ober und Unter im Wechsel, Beine zweimal pro Runde.':'Keine Rotation. Wähle 3 oder 4 Tage, dann sagt dir die Startseite, was dran ist.');
+  var hint=mode==='week'?'Jede Woche A, B, C. Ein viertes Training ist Beine extra. Neue Woche startet wieder bei A.':'Keine Rotation. Schalte sie an, dann sagt dir die Startseite, was dran ist.';
   return `<div class="header">
      <div><div class="eyebrow">TRAININGSPLÄNE</div><div class="dateBig">Deine Routinen</div></div>
      <div class="top-icons"><button class="icon-btn tap" data-a="menu" aria-label="Menü — Daten &amp; Sicherung">${ico('menu',22,'#8C8895')}</button>${ico('clipboard',24,'#F5C518')}</div>
@@ -1248,7 +1262,7 @@ document.addEventListener('click',function(ev){
     case'planopen':ui.activePlanId=id;go('plan');break;
     case'planback':go('plans');break;
     case'homeplan':ui.activePlanId=id;ui.origin='home';go('plan');break;
-    case'rotmode':{data.schedule=v==='off'?emptySchedule():{mode:v,planIds:ROTATION[v].slice()};save();render();toast(v==='off'?'Rotation aus':'Rotation: '+v+' Tage');break;}
+    case'rotmode':{data.schedule=v==='off'?emptySchedule():{mode:'week',planIds:ROTATION_WEEK.slice()};save();render();toast(v==='off'?'Rotation aus':'Rotation an');break;}
     case'plannew':ui.editPlanId=null;ui.planDraft={name:''};ui.modal='plannew';ui.focus='planName';renderModal();break;
     case'planedit':{var ep=plan(ui.activePlanId);if(!ep)break;ui.editPlanId=ep.id;ui.planDraft={name:ep.name};ui.modal='plannew';ui.focus='planName';renderModal();break;}
     case'plansubmit':{var pn=(document.getElementById('planName').value||'').trim();if(!pn)return;
