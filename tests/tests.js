@@ -54,5 +54,36 @@ migrate();
 check('seed uses existing ids', plan('plan-gk-a').exIds.indexOf('ex-1')>=0 && plan('plan-gk-a').exIds.indexOf('schraeg-kh')<0);
 var pc=data.plans.length; migrate(); check('seed idempotent', data.plans.length===pc);
 
+section('targets + suggestion');
+fresh();
+var P=plan('plan-gk-a'), T='2026-09-29';
+function mk(id,date,w,r,i){return {id:id+date+i,exerciseId:id,date:date,ts:Date.parse(date)+i,weight:w,mode:'reps',reps:r};}
+check('rule from plan', ruleFor(P,'beinpresse').incr===5);
+check('rule default Beine', ruleFor({exIds:[],targets:{}},'beinstrecker').repMax===15);
+check('rule default upper', ruleFor({exIds:[],targets:{}},'latzug').repMax===12 && ruleFor({exIds:[],targets:{}},'latzug').incr===2.5);
+check('rule default bw', ruleFor({exIds:[],targets:{}},'hangraise').incr===0);
+check('rule default time', ruleFor({exIds:[],targets:{}},'plank').repMax===undefined && ruleFor({exIds:[],targets:{}},'plank').sets===3);
+check('no history -> first', suggestFor(P,'beinpresse',T).first===true && suggestFor(P,'beinpresse',T).weight===null);
+data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3)];
+var s=suggestFor(P,'beinpresse',T);
+check('all sets at top -> +5 up', s.weight===65 && s.up===true && s.repMin===10 && s.repMax===15);
+data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,14,3),mk('beinpresse','2026-09-20',60,15,4)];
+s=suggestFor(P,'beinpresse',T); check('partial no up', s.weight===60 && s.up===false);
+data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2)];
+s=suggestFor(P,'beinpresse',T); check('too few sets no up', s.weight===60 && s.up===false);
+data.sets=[mk('latzug','2026-09-20',56,12,1),mk('latzug','2026-09-20',56,12,2),mk('latzug','2026-09-20',56,12,3),mk('latzug','2026-09-27',52,10,1)];
+s=suggestFor(P,'latzug',T); check('uses latest session only', s.weight===52 && s.up===false);
+data.sets=[mk('latzug','2026-09-29',56,12,1)];
+s=suggestFor(P,'latzug',T); check('today sets ignored', s.first===true);
+data.sets=[mk('latzug','2026-09-20',50,12,1),mk('latzug','2026-09-20',56,12,2),mk('latzug','2026-09-20',56,12,3)];
+s=suggestFor(P,'latzug',T); check('most frequent weight wins', s.weight===58.5 && s.up===true);
+data.sets=[{id:'p1',exerciseId:'plank',date:'2026-09-20',ts:1,weight:0,mode:'time',seconds:60},{id:'p2',exerciseId:'plank',date:'2026-09-20',ts:2,weight:0,mode:'time',seconds:75}];
+s=suggestFor(plan('plan-gk-b'),'plank',T); check('time exercise suggests best seconds', s.seconds===75 && s.weight===null);
+data.sets=[mk('hangraise','2026-09-20',0,15,1),mk('hangraise','2026-09-20',0,15,2),mk('hangraise','2026-09-20',0,15,3)];
+s=suggestFor(P,'hangraise',T); check('bodyweight never up', s.weight===0 && s.up===false);
+check('fmtTarget', fmtTarget({sets:3,repMin:10,repMax:15,weight:65,up:true,first:false},ex('beinpresse'))==='3 × 10–15 · 65 kg');
+check('fmtTarget first', fmtTarget({sets:3,repMin:8,repMax:12,weight:null,up:false,first:true},ex('latzug'))==='3 × 8–12 · erstes Mal');
+check('fmtTarget time', fmtTarget({sets:3,seconds:75,weight:null,first:false},ex('plank'))==='3 × 1:15');
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');

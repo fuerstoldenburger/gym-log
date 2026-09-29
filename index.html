@@ -341,6 +341,38 @@ var GROUPS=['Alle','Brust','Rücken','Beine','Schulter','Arme','Bauch','Cardio']
 
 function ex(id){return data.exercises.find(function(e){return e.id===id;});}
 function setsFor(id){return data.sets.filter(function(s){return s.exerciseId===id;});}
+function ruleFor(p,exId){
+  if(p&&p.targets&&p.targets[exId])return p.targets[exId];
+  var e=ex(exId);if(!e)return RULES.U;
+  if(isTime(e)||isCardio(e))return RULES.T;
+  if(e.bw)return RULES.BW;
+  return e.group==='Beine'?RULES.L:RULES.U;
+}
+function lastSessionSets(exId,todayKey){
+  var ss=setsFor(exId).filter(function(s){return s.date<todayKey;});
+  if(!ss.length)return null;
+  var last=ss.reduce(function(m,s){return s.date>m?s.date:m;},'');
+  return ss.filter(function(s){return s.date===last;}).sort(function(a,b){return a.ts-b.ts;});
+}
+function suggestFor(p,exId,todayKey){
+  var e=ex(exId),r=ruleFor(p,exId),ls=lastSessionSets(exId,todayKey);
+  var out={sets:r.sets,repMin:r.repMin,repMax:r.repMax,weight:null,up:false,seconds:null,first:!ls};
+  if(!ls||!e)return out;
+  if(isTime(e)){out.seconds=ls.reduce(function(m,s){return Math.max(m,s.seconds||0);},0);return out;}
+  if(isCardio(e))return out;
+  var cnt={};ls.forEach(function(s){var w=s.weight||0;cnt[w]=(cnt[w]||0)+1;});
+  var w=Number(Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a]||Number(b)-Number(a);})[0]);
+  var hit=!!r.repMax&&ls.length>=r.sets&&ls.every(function(s){return (s.reps||0)>=r.repMax;});
+  if(e.bw&&w===0){out.weight=0;return out;}
+  out.up=hit&&r.incr>0;out.weight=out.up?w+r.incr:w;
+  return out;
+}
+function fmtTarget(s,e){
+  if(e&&isTime(e))return s.sets+' × '+(s.seconds?fmtTimeShort(s.seconds):(s.first?'erstes Mal':'Zeit'));
+  var reps=s.repMin?s.repMin+'–'+s.repMax:'';
+  var w=s.first?'erstes Mal':(e&&e.bw&&!s.weight?'Körpergewicht':s.weight+' kg');
+  return s.sets+' × '+reps+' · '+w;
+}
 
 /* ============ mutations ============ */
 function addSet(id,p){
