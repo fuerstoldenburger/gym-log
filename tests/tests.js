@@ -152,5 +152,30 @@ check('v2 import gets empty schedule and seeds', data.schedule.mode===null && !!
 applyImport(payload);
 check('v3 import keeps schedule', data.schedule.mode==='4' && data.plans.filter(function(p){return p.id==='plan-un-1';}).length===1);
 
+section('review fixes');
+// 1. renamed built-in must not get a duplicate id
+localStorage.clear(); data={exercises:DEFAULTS.map(function(e){return Object.assign({},e);}),sets:[],plans:defaultPlans(),body:[]};
+data.exercises.find(function(e){return e.id==='bank';}).name='Bench Press'; migrate();
+check('renamed built-in: no duplicate id', data.exercises.filter(function(e){return e.id==='bank';}).length===1 && !data.exercises.some(function(e){return e.name==='Bankdrücken';}));
+// 2. deleting a rotation plan keeps the pointer sane
+fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+data.plans=data.plans.filter(function(p){return p.id!=='plan-gk-b';}); 
+data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1)];
+check('missing plan skipped in rotation', nextPlanId('2026-09-29')==='plan-gk-c' && todayPlanState('2026-09-29').planId==='plan-gk-c');
+check('home card survives a deleted plan', (function(){ui.view='home';return viewHome().indexOf('HEUTE DRAN')>=0;})());
+// 3. no prefill when a set exists today
+fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()}; var T3=dayKey(new Date());
+data.sets=[mk('beinpresse','2026-09-20',60,15,1),mk('beinpresse','2026-09-20',60,15,2),mk('beinpresse','2026-09-20',60,15,3),mk('beinpresse',T3,62.5,10,1)];
+ui.origin='plan'; ui.activePlanId='plan-gk-a'; ui.draft=null; ui.prefilled={}; ensureDraft(ex('beinpresse')); applyTargetPrefill(ex('beinpresse'),T3);
+check('no prefill after reload when logged today', ui.draft.weight===62.5);
+// 4. duplicates with sets on both sides stay; archived ids leave plan exIds
+localStorage.clear();
+data={exercises:DEFAULTS.map(function(e){return Object.assign({},e);}).concat([{id:'ex-b',name:'Butterfly',group:'Brust',bw:false,mode:'reps'},{id:'ex-c',name:'Butterfly',group:'Brust',bw:false,mode:'reps'}]),
+  sets:[mk('butterfly','2026-09-01',35,12,1),mk('ex-b','2026-09-02',30,12,1)],plans:[{id:'plan-x',name:'X',exIds:['ex-c','bank']}],body:[]};
+migrate();
+check('both with sets kept', !ex('butterfly').archived && !ex('ex-b').archived);
+check('empty duplicate archived', ex('ex-c').archived===true);
+check('archived duplicate removed from plan exIds', plan('plan-x').exIds.indexOf('ex-c')<0 && plan('plan-x').exIds.indexOf('bank')>=0);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');

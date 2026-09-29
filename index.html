@@ -290,7 +290,7 @@ function migrate2609(){
   data.exercises.forEach(function(e){var g=fix[normName(e.name)];if(g)e.group=g;});
   /* 3. add missing defaults by name */
   DEFAULTS.forEach(function(d){
-    if(!data.exercises.some(function(e){return normName(e.name)===normName(d.name);}))
+    if(!data.exercises.some(function(e){return e.id===d.id||normName(e.name)===normName(d.name);}))
       data.exercises.push({id:d.id,name:d.name,group:d.group,bw:d.bw,mode:d.mode});
   });
   /* 4. archive duplicates without sets (keep the one with sets, else the built-in one, else the first) */
@@ -299,8 +299,11 @@ function migrate2609(){
     var n=normName(e.name);if(e.archived)return;
     if(!seen[n]){seen[n]=e;return;}
     var a=seen[n],b=e,na=setsFor(a.id).length,nb=setsFor(b.id).length;
+    if(na>0&&nb>0)return;                       /* both have history: not a duplicate to hide */
     if(nb>na||(nb===na&&isDefaultId(b.id)&&!isDefaultId(a.id))){a.archived=true;seen[n]=b;}else{b.archived=true;}
   });
+  var arch={};data.exercises.forEach(function(e){if(e.archived)arch[e.id]=1;});
+  data.plans.forEach(function(p){p.exIds=p.exIds.filter(function(x){return !arch[x];});});
   seedPlans();
   data.migrations.rotation2609=true;
 }
@@ -372,8 +375,9 @@ function suggestFor(p,exId,todayKey){
   out.up=hit&&r.incr>0;out.weight=out.up?w+r.incr:w;
   return out;
 }
+function rotationIds(){return data.schedule.planIds.filter(function(id){return !!plan(id);});}
 function planDayOf(dateKey,prevId){
-  var ids=data.schedule.planIds;if(!ids.length)return null;
+  var ids=rotationIds();if(!ids.length)return null;
   var logged={};data.sets.forEach(function(s){if(s.date===dateKey)logged[s.exerciseId]=1;});
   var best=[],bestN=1;
   ids.forEach(function(pid){var p=plan(pid);if(!p)return;var n=p.exIds.filter(function(x){return logged[x];}).length;
@@ -389,13 +393,13 @@ function lastPlanDayBefore(todayKey){
   return null;
 }
 function nextPlanId(todayKey){
-  var ids=data.schedule.planIds;if(!data.schedule.mode||!ids.length)return null;
+  var ids=rotationIds();if(!data.schedule.mode||!ids.length)return null;
   var last=lastPlanDayBefore(todayKey);
   if(!last)return ids[0];
   return ids[(ids.indexOf(last.planId)+1)%ids.length];
 }
 function todayPlanState(todayKey){
-  var ids=data.schedule.planIds;if(!data.schedule.mode||!ids.length)return {kind:'off'};
+  var ids=rotationIds();if(!data.schedule.mode||!ids.length)return {kind:'off'};
   var last=lastPlanDayBefore(todayKey);
   var todayId=planDayOf(todayKey,last?last.planId:null);
   if(todayId){var p=plan(todayId);var done=planDoneCount(p,todayKey);
@@ -847,6 +851,7 @@ function ensureDraft(e){
 function applyTargetPrefill(e,todayKey){
   if(ui.origin!=='plan'||!ui.activePlanId||!ui.draft||ui.draft.exId!==e.id)return;
   if(ui.prefilled[e.id]===todayKey)return;
+  if(data.sets.some(function(x){return x.exerciseId===e.id&&x.date===todayKey;})){ui.prefilled[e.id]=todayKey;return;}
   var p=plan(ui.activePlanId);if(!p||p.exIds.indexOf(e.id)<0)return;
   var s=suggestFor(p,e.id,todayKey);
   if(isTime(e)){if(s.seconds)ui.draft.seconds=s.seconds;}
@@ -1253,7 +1258,7 @@ document.addEventListener('click',function(ev){
       ui.modal=null;ui.focus=null;ui.activePlanId=np.id;go('plan');toast('Plan angelegt');break;}
     case'plandel':{var dp=plan(ui.activePlanId);if(!dp)break;
       if(!confirm('Plan "'+dp.name+'" löschen? Deine geloggten Sätze bleiben erhalten.'))break;
-      data.plans=data.plans.filter(function(x){return x.id!==dp.id;});save();go('plans');toast('Plan gelöscht');break;}
+      data.plans=data.plans.filter(function(x){return x.id!==dp.id;});data.schedule.planIds=data.schedule.planIds.filter(function(x){return x!==dp.id;});save();go('plans');toast('Plan gelöscht');break;}
     case'planaddex':ui.pickQ='';ui.modal='pickex';ui.focus='pickQ';renderModal();break;
     case'pickex':{var pp=plan(ui.activePlanId);if(pp&&pp.exIds.indexOf(id)<0){pp.exIds.push(id);save();}
       ui.modal=null;ui.focus=null;render();toast('Übung im Plan');break;}
