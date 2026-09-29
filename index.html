@@ -367,6 +367,37 @@ function suggestFor(p,exId,todayKey){
   out.up=hit&&r.incr>0;out.weight=out.up?w+r.incr:w;
   return out;
 }
+function planDayOf(dateKey,prevId){
+  var ids=data.schedule.planIds;if(!ids.length)return null;
+  var logged={};data.sets.forEach(function(s){if(s.date===dateKey)logged[s.exerciseId]=1;});
+  var best=[],bestN=1;
+  ids.forEach(function(pid){var p=plan(pid);if(!p)return;var n=p.exIds.filter(function(x){return logged[x];}).length;
+    if(n>bestN){best=[pid];bestN=n;}else if(n===bestN&&n>=2)best.push(pid);});
+  if(!best.length)return null;
+  if(best.length>1&&prevId){var exp=ids[(ids.indexOf(prevId)+1)%ids.length];if(best.indexOf(exp)>=0)return exp;}
+  return best[0];
+}
+function lastPlanDayBefore(todayKey){
+  var days={};data.sets.forEach(function(s){if(s.date<todayKey)days[s.date]=1;});
+  var keys=Object.keys(days).sort().reverse();
+  for(var i=0;i<keys.length;i++){var pid=planDayOf(keys[i]);if(pid)return {date:keys[i],planId:pid};}
+  return null;
+}
+function nextPlanId(todayKey){
+  var ids=data.schedule.planIds;if(!data.schedule.mode||!ids.length)return null;
+  var last=lastPlanDayBefore(todayKey);
+  if(!last)return ids[0];
+  return ids[(ids.indexOf(last.planId)+1)%ids.length];
+}
+function todayPlanState(todayKey){
+  var ids=data.schedule.planIds;if(!data.schedule.mode||!ids.length)return {kind:'off'};
+  var last=lastPlanDayBefore(todayKey);
+  var todayId=planDayOf(todayKey,last?last.planId:null);
+  if(todayId){var p=plan(todayId);var done=planDoneCount(p,todayKey);
+    if(done>=p.exIds.length)return {kind:'done',planId:todayId,nextId:ids[(ids.indexOf(todayId)+1)%ids.length]};
+    return {kind:'today',planId:todayId,done:done,total:p.exIds.length};}
+  return {kind:'next',planId:nextPlanId(todayKey)};
+}
 function fmtTarget(s,e){
   if(e&&isTime(e))return s.sets+' × '+(s.seconds?fmtTimeShort(s.seconds):(s.first?'erstes Mal':'Zeit'));
   var reps=s.repMin?s.repMin+'–'+s.repMax:'';

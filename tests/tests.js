@@ -85,5 +85,22 @@ check('fmtTarget', fmtTarget({sets:3,repMin:10,repMax:15,weight:65,up:true,first
 check('fmtTarget first', fmtTarget({sets:3,repMin:8,repMax:12,weight:null,up:false,first:true},ex('latzug'))==='3 × 8–12 · erstes Mal');
 check('fmtTarget time', fmtTarget({sets:3,seconds:75,weight:null,first:false},ex('plank'))==='3 × 1:15');
 
+section('rotation');
+fresh(); data.schedule={mode:'3',planIds:ROTATION['3'].slice()};
+var T='2026-09-29';
+check('next: no history -> first', nextPlanId(T)==='plan-gk-a');
+check('state next', todayPlanState(T).kind==='next' && todayPlanState(T).planId==='plan-gk-a');
+data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1)];
+check('after A -> B', nextPlanId(T)==='plan-gk-b');
+data.sets=[mk('beinpresse','2026-09-20',60,12,1)];
+check('one exercise does not count', nextPlanId(T)==='plan-gk-a' && planDayOf('2026-09-20')===null);
+data.sets=[mk('kreuz','2026-09-25',80,8,1),mk('bank','2026-09-25',60,8,1)];
+check('after C -> A (wrap)', nextPlanId(T)==='plan-gk-a');
+data.sets=[mk('beinpresse','2026-09-20',60,12,1),mk('latzug','2026-09-20',50,12,1),mk('kniebeuge-g','2026-09-29',40,12,1),mk('schraeg','2026-09-29',50,10,1)];
+var st=todayPlanState(T); check('today matched B with done 2/6', st.kind==='today' && st.planId==='plan-gk-b' && st.done===2 && st.total===6);
+data.sets=plan('plan-gk-b').exIds.map(function(id,i){return {id:'d'+i,exerciseId:id,date:'2026-09-29',ts:i,weight:10,mode:'reps',reps:10};});
+st=todayPlanState(T); check('today complete -> done with next C', st.kind==='done' && st.nextId==='plan-gk-c');
+data.schedule=emptySchedule(); check('schedule off', todayPlanState(T).kind==='off' && nextPlanId(T)===null);
+
 print('\n'+__pass+' passed, '+__fail+' failed');
 if(__fail) throw new Error(__fail+' checks failed');
